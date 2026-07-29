@@ -9,12 +9,17 @@ declare(strict_types=1);
 
 namespace WCBOM;
 
+use WCBOM\Admin\DeletionGuard;
+use WCBOM\Admin\ProductBomMetabox;
+use WCBOM\Bom\BomRepository;
+use WCBOM\Rest\Api;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Service wiring root. Feature modules (ledger, BOM editor, order sync,
  * manufacture orders, admin screens) register themselves from here as
- * each phase lands — Phase 0 only needs the schema and HPOS declaration.
+ * each phase lands.
  */
 final class Plugin {
 
@@ -46,6 +51,19 @@ final class Plugin {
 	 * is confirmed active.
 	 */
 	public function init(): void {
-		// Phase 1+: Stock\Ledger, Stock\StockService, Admin\ProductBomMetabox, etc.
+		$boms = new BomRepository();
+
+		( new ProductBomMetabox() )->register();
+		( new DeletionGuard( $boms ) )->register();
+
+		add_action(
+			'rest_api_init',
+			static function () use ( $boms ) {
+				( new Api( $boms ) )->register_routes();
+			}
+		);
+
+		// Phase 2+: Stock\Ledger/StockService wire into Orders\OrderSync;
+		// Phase 4: Manufacture\ManufactureService.
 	}
 }
