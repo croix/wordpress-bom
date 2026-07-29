@@ -1,0 +1,30 @@
+{
+    "name": "sliquid/wc-bom-stock",
+    "description": "Bill-of-materials and component-level stock management for WooCommerce.",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=8.1"
+    },
+    "require-dev": {
+        "wp-coding-standards/wpcs": "^3.0",
+        "phpcompatibility/phpcompatibility-wp": "^2.1",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "phpstan/phpstan": "^2.1",
+        "szepeviktor/phpstan-wordpress": "^2.0",
+        "php-stubs/woocommerce-stubs": "^8.9",
+        "php-stubs/wp-cli-stubs": "^2.12"
+    },
+    "autoload": {
+        "psr-4": {
+            "WCBOM\\": "src/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        },
+        "platform": {
+            "php": "8.1"
+        }
+    }
+}

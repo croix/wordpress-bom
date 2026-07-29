@@ -38,7 +38,7 @@ This build moves between at least two Macs with **different CPU architectures** 
 
 ## Status / next step
 
-- [ ] Phase 0: wp-env setup, plugin scaffold, tables, fixture seeder — **environment setup in progress, see Progress Log**
+- [x] Phase 0: wp-env setup, plugin scaffold, tables, fixture seeder — **done and verified 2026-07-29, see Progress Log**
 - [ ] Phase 1: ledger + StockService + BOM editor
 - [ ] Phase 2: order consumption/restoration
 - [ ] Phase 3: phantom (buildable) stock
@@ -53,6 +53,49 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-29 — Phase 0 complete: scaffold built, wp-env verified end-to-end
+
+**Phase 0 is done and fully verified**, continuing straight from the environment setup below (same session, same machine — arm64 Mac). Everything in BUILD_PLAN.md's Phase 0 (wp-env setup, plugin scaffold, tables, fixture seeder) now exists and has been proven to work by actually running it, not just written.
+
+**What was built (all committed to the repo):**
+- `composer.json` — PSR-4 (`WCBOM\` → `src/`), require-dev: `wp-coding-standards/wpcs`, `phpcompatibility/phpcompatibility-wp`, `phpstan/phpstan` (^2.1 — bumped up from an initial ^1.11, see gotcha below), `szepeviktor/phpstan-wordpress` (^2.0), `php-stubs/woocommerce-stubs`, `php-stubs/wp-cli-stubs`.
+- `wc-bom-stock.php` — bootstrap: constants, autoload require, activation hook → `Schema::install()`, `before_woocommerce_init` → `Hpos::declare_compatibility()`, `plugins_loaded` → `Plugin::instance()->init()` (with a WooCommerce-missing admin notice guard), `WP_CLI::add_command('wcbom', ...)`.
+- `uninstall.php` — drops tables only if `wcbom_purge_data_on_uninstall` option is `'yes'` (default: keep data). Logic wrapped in a prefixed `wcbom_run_uninstall()` function (WPCS requires prefixed globals at file scope).
+- `src/Plugin.php` — singleton service-wiring root, currently a no-op `init()` — Phase 1 fills this in.
+- `src/Install/Schema.php` — dbDelta definitions for all 5 tables from BUILD_PLAN.md §4 (`wcbom_boms`, `wcbom_bom_items`, `wcbom_manufacture_orders`, `wcbom_manufacture_order_items`, `wcbom_stock_ledger`), versioned via a `wcbom_db_version` option so `maybe_upgrade()` can re-run dbDelta (idempotent) when `Schema::DB_VERSION` bumps.
+- `src/Integrations/Hpos.php` — declares `custom_order_tables` + `cart_checkout_blocks` compatibility.
+- `src/Cli/Commands.php` — `wp wcbom seed [--reset]`: creates the 10 fixture components (blank tumbler + glitter/vinyl/epoxy/straws/caps/stickers), 1 premade product (`Ocean Wave 24oz Tumbler`, stock 12), and 1 made-to-order variable product (`Custom 24oz Tumbler`, glitter-color × straw-upgrade attributes, 4 variations) — **and writes a real starter BOM directly into `wcbom_boms`/`wcbom_bom_items`** (always-lines for blank/epoxy/cap, attribute-conditional lines for glitter color and straw upgrade). This gives Phase 1's BOM editor real data to load against from day one.
+- `phpcs.xml.dist` (WordPress-Extra minus the two `WordPress.Files.FileName` sniffs — those enforce classic `class-{name}.php` naming, which directly conflicts with PSR-4's file-name-matches-class-name requirement; excluding them is the standard approach for namespaced/Composer-autoloaded WP plugins) and `phpstan.neon.dist` (level 6). **Both run clean against the full source tree right now.**
+- `.wp-env.json` — WP + WooCommerce + `woo-extra-product-options` + `variation-swatches-woo`, `afterStart` lifecycle script activates all four plugins and runs `wp wcbom seed`.
+- `package.json` / `assets/src/bom-editor/index.js` — `@wordpress/env` + `@wordpress/scripts` scaffold; `bom-editor` entry is an empty stub, not yet enqueued (Phase 1 work).
+
+**Gotchas hit getting tooling to actually run clean (all fixed, all documented here so they aren't re-discovered):**
+1. **PHPStan + WooCommerce stubs need real memory and no parallelism.** Plain `vendor/bin/phpstan analyse` crashed at the default memory limit even at 512M–1536M *in parallel mode* — each parallel worker loads its own copy of the (large) WooCommerce stubs. Fix baked into `phpstan.neon.dist`: `parameters.parallel.maximumNumberOfProcesses: 1`. Fix baked into `package.json`'s `analyze` script: `--memory-limit=1536M`. With both, a plain `composer`/`npm run analyze` just works — no flags to remember.
+2. **WP-CLI stubs: use `wp-cli-stubs.php` only, not `wp-cli-commands-stubs.php`.** The latter references `Composer\IO\NullIO`, which isn't loaded in PHPStan's bootstrap context and throws. Only the base stub is needed to satisfy `WP_CLI::*` calls in `Commands.php`.
+3. **`excludePaths` entries must exist or be marked optional.** `phpstan.neon.dist` excludes `vendor` and `node_modules` — before either is installed, PHPStan errors on a missing path unless suffixed `(?)`. Both are now marked optional.
+4. **Root-owned npm cache** (`~/.npm/_cacache/...`, leftover from some earlier `sudo npm` invocation) broke `npm install` outright (`EACCES`/`EEXIST` on cache writes). Fixed without touching the broken cache (would need sudo) by pointing npm at a fresh cache dir instead: `npm config set cache "/Users/colin/.npm-cache-wcbom" --location=user`. If `npm install` ever fails with cache `EACCES`/`EEXIST` again on this machine, check `npm config get cache` first.
+5. **`npx wp-env start` reliably fails silently partway through in this environment (Claude Code's sandboxed shell), every time it was tried, in both foreground and backgrounded runs.** It downloads the plugin zips fine and extracts them into `~/.wp-env/<hash>/<slug>.temp/<slug>/`, but the final "move `.temp/<slug>` → `<slug>` and build the wordpress/cli images" step never happens — the process just exits 0 right after the mysql container starts, as if finished, with no error anywhere. **Root cause unconfirmed** — may be specific to running wp-env through this harness's Bash tool rather than a real interactive Terminal; worth just trying `wp-env start` directly in a normal Terminal at home before assuming this workaround is needed there too. **Workaround that got a fully working environment (used this session):**
+   - Let `wp-env start` run once (it generates `~/.wp-env/<hash>/docker-compose.yml` + Dockerfiles + downloads/partially-extracts the zips even though it won't finish).
+   - `cd ~/.wp-env/<hash>` and check each plugin folder for a top-level `*.php` file (`ls <slug>/*.php`). If missing/incomplete (this session: all three were incomplete — only a couple of subfolders each, no main plugin file), delete the folder and redo it yourself: `curl -fSL https://downloads.wordpress.org/plugin/<slug>.zip -o /tmp/<slug>.zip && unzip -q /tmp/<slug>.zip -d ~/.wp-env/<hash>/`.
+   - `docker compose up -d` (brings up mysql, builds + starts wordpress/cli).
+   - `docker compose exec -T cli wp core install --path=/var/www/html --url="http://localhost:8888" --title="wc-bom-stock dev" --admin_user=admin --admin_password=password --admin_email=[redacted] --skip-email`
+   - `docker compose exec -T cli wp plugin activate woocommerce woo-extra-product-options variation-swatches-woo wordpress-bom/wc-bom-stock.php --path=/var/www/html` — **note the plugin identifier**: it's `wordpress-bom/wc-bom-stock.php`, not `wc-bom-stock`. wp-env mounts the plugin-under-development using the **local repo directory's basename** as the in-container folder name, and this repo's directory is `wordpress-bom` (not `wc-bom-stock`). This is why `.wp-env.json`'s `lifecycleScripts.afterStart` also references the full `wordpress-bom/wc-bom-stock.php` path. **This will keep working at home as long as `git clone` isn't given a custom target dirname** (plain `git clone https://github.com/croix/wordpress-bom.git` preserves the `wordpress-bom` folder name automatically) — if anyone ever clones this into a differently-named directory, update the folder segment in `.wp-env.json`'s `lifecycleScripts.afterStart` to match.
+   - `docker compose exec -T cli wp wcbom seed --path=/var/www/html`
+6. **If a plugin folder under `~/.wp-env/<hash>/` is deleted and recreated *while the wordpress/cli containers are already running*, Docker's bind mount goes stale and shows the folder as empty inside the container**, even though the host filesystem is correct. Fix: `docker compose restart wordpress cli` — it re-resolves the mount. (This bit us mid-session: after manually re-extracting the plugin zips, `wp plugin list` still couldn't see them until we restarted those two containers.)
+
+**Verified working end-to-end this session** (via `docker compose exec` and a real browser login at `http://localhost:8888`, admin/password):
+- `composer install`, `vendor/bin/phpcs` (clean), `vendor/bin/phpstan analyse` (clean, level 6) all run successfully on this machine.
+- `wp wcbom seed` → `Success: Seeded 10 components, 1 premade product (#20), 1 made-to-order product (#21) with BOM #1.`
+- Queried `wp_wcbom_boms`/`wp_wcbom_bom_items` directly — one BOM header + 7 lines, exactly matching the intended always/attribute-conditional split (blank tumbler/epoxy/standard cap always; glitter color and straw choice attribute-conditional).
+- 4 variations created on the made-to-order product with correct attribute combinations and prices ($24.99 standard straw / $29.99 upgraded).
+- wp-admin Products list: all 12 products present, correct stock quantities, variable product correctly shows a `$24.99–$29.99` price range.
+- No entries at all in `wp-content/debug.log` (WP_DEBUG_LOG on) — no PHP notices/warnings/errors anywhere in the flow.
+- Plugins screen: all 4 plugins (WooCommerce, ThemeHigh EPO, variation-swatches-woo, wc-bom-stock) active, no error banners.
+
+**Current running state:** the wp-env stack is up right now at `http://localhost:8888` (wp-admin: `admin` / `password`), hash dir `~/.wp-env/ea23fdf09a0f4cde2cad3f159c4e344a`. Not destroyed — should still be running/resumable via `docker start` on the same containers if this session's Docker Desktop instance is still around; otherwise redo the workaround in point 5 above (steps after the initial `wp-env start` generates the compose files).
+
+**Next step: Phase 1** — ledger (`Stock\Ledger`), `Stock\StockService` (row-locked, `wc_update_product_stock()`), and the React BOM editor metabox (`Admin\ProductBomMetabox` + `assets/src/bom-editor`) reading/writing the same `wcbom_boms`/`wcbom_bom_items` tables the seeder already populates.
 
 ### 2026-07-29 — Environment setup (Phase 0, in progress)
 

@@ -7,3 +7,5 @@ vendor/
 .wp-env.override.json
 /wp-env-home/
 *.log
+/build/
+/languages/*.pot

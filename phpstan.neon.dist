@@ -1,0 +1,19 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 6
+    parallel:
+        # The WooCommerce stubs are large enough that parallel workers each
+        # loading their own copy reliably exhausts memory; keep this serial.
+        maximumNumberOfProcesses: 1
+    paths:
+        - src
+        - wc-bom-stock.php
+        - uninstall.php
+    excludePaths:
+        - vendor (?)
+        - node_modules (?)
+    bootstrapFiles:
+        - vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
+        - vendor/php-stubs/wp-cli-stubs/wp-cli-stubs.php

@@ -1,0 +1,17 @@
+{
+    "phpVersion": "8.1",
+    "plugins": [
+        ".",
+        "https://downloads.wordpress.org/plugin/woocommerce.zip",
+        "https://downloads.wordpress.org/plugin/woo-extra-product-options.zip",
+        "https://downloads.wordpress.org/plugin/variation-swatches-woo.zip"
+    ],
+    "config": {
+        "WP_DEBUG": true,
+        "WP_DEBUG_LOG": true,
+        "WP_DEBUG_DISPLAY": false
+    },
+    "lifecycleScripts": {
+        "afterStart": "wp plugin activate woocommerce woo-extra-product-options variation-swatches-woo wordpress-bom/wc-bom-stock.php && wp wcbom seed"
+    }
+}
