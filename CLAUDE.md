@@ -29,6 +29,53 @@ This build moves between at least two Macs with **different CPU architectures** 
 - Before running `brew install` on any machine, confirm `uname -m` matches the architecture the active `brew` on `PATH` actually targets — cheap check, avoids a repeat of the wrong-architecture Docker install.
 - Lockfiles (`package-lock.json`, `composer.lock`) **should** be committed as normal — they pin versions, not architecture-specific binaries — but always re-run the install command after cloning on a new machine rather than assuming installed dependencies carried over via git.
 
+## Environment quickstart (fresh machine, e.g. the Intel home laptop)
+
+One-stop, ordered runbook. The Progress Log below has the full story of *why*; this is just the *what*, in order. Skip any step whose prerequisite already works.
+
+**1. Prerequisites — check each, install only if missing:**
+- Homebrew: `which brew`. If missing: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`. **On Intel, there is only one correct prefix, `/usr/local`** — none of the dual-Homebrew/Rosetta gotchas in the Progress Log below apply; those were specific to the arm64 build machine having only an emulated Intel Homebrew.
+- Node: `node -v`. If missing: `brew install node`.
+- Command Line Tools: `xcode-select -p`. If it errors: `xcode-select --install` (GUI installer, needs you at the keyboard).
+- Docker Desktop: `docker info`. If missing: `brew install --cask docker`, then launch `/Applications/Docker.app` and complete first-run setup yourself (license + privileged-helper password prompt — can't be scripted).
+- Composer (pulls PHP as a dependency): `composer --version`. If missing: `brew install composer`.
+
+**2. Clone and install dependencies:**
+```
+git clone https://github.com/croix/wordpress-bom.git
+cd wordpress-bom
+composer install
+npm install
+```
+(`composer.lock`/`package-lock.json` are committed, so this pulls the exact versions verified working — see Multi-machine note above on why reinstalling fresh here matters.)
+
+**3. Bring up the dev environment — try the standard path first:**
+```
+npx wp-env start
+```
+Give it a few minutes (first run pulls/builds Docker images). Check `docker ps` — you should see 4+ containers (mysql, wordpress, cli, phpmyadmin, plus `tests-*` variants). If so, skip to step 4.
+
+**If it silently stalls** (only the `mysql` container ever appears, command exits 0 with no error) — this happened reliably on the arm64 build machine, cause unconfirmed (possibly specific to running through Claude Code's sandboxed shell rather than a real Terminal, so it may just work fine here). Manual fallback:
+```
+cd ~/.wp-env/<hash>          # find <hash> via: ls ~/.wp-env/
+# Check each plugin folder actually has its main file:
+ls woocommerce/*.php woo-extra-product-options/*.php variation-swatches-woo/*.php
+# For any that are missing/incomplete, redo it directly:
+curl -fSL https://downloads.wordpress.org/plugin/<slug>.zip -o /tmp/<slug>.zip
+unzip -q /tmp/<slug>.zip -d ~/.wp-env/<hash>/
+docker compose up -d
+docker compose exec -T cli wp core install --path=/var/www/html --url="http://localhost:8888" --title="wc-bom-stock dev" --admin_user=admin --admin_password=password --admin_email=[redacted] --skip-email
+docker compose exec -T cli wp plugin activate woocommerce woo-extra-product-options variation-swatches-woo wordpress-bom/wc-bom-stock.php --path=/var/www/html
+docker compose exec -T cli wp wcbom seed --path=/var/www/html
+```
+(The plugin identifier is `wordpress-bom/wc-bom-stock.php` — wp-env names the in-container folder after this repo's directory name, `wordpress-bom`, not the plugin slug. A plain `git clone` above preserves that name automatically.)
+
+**4. Verify it worked:**
+- Visit `http://localhost:8888/wp-admin`, log in `admin` / `password`.
+- Products list should show 12 items (10 components + premade + made-to-order) — see BUILD_PLAN.md's fixture catalog.
+- Plugins screen: WooCommerce, ThemeHigh EPO, variation-swatches-woo, and wc-bom-stock all active, no error banners.
+- `docker compose exec -T wordpress cat /var/www/html/wp-content/debug.log` should be empty/missing (no PHP notices).
+
 ## Conventions
 
 - PHP 8.1+, PSR-4 (`WCBOM\` → `src/`), WPCS-Extra + PHPStan level 6.
