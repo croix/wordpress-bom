@@ -1,2 +1,9 @@
 .claude/settings.local.json
 .DS_Store
+
+# Host-specific / architecture-specific — never commit, reinstall fresh per machine
+node_modules/
+vendor/
+.wp-env.override.json
+/wp-env-home/
+*.log
