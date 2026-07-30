@@ -20,6 +20,15 @@ function formatNumber( n ) {
 	return String( Math.round( n * 10000 ) / 10000 );
 }
 
+// @wordpress/components' BaseControl no longer applies its own bottom
+// margin regardless of __nextHasNoMarginBottom (confirmed empty either
+// way in the currently-targeted WP version), so a field stacked directly
+// after another element needs explicit spacing or its label visually
+// runs into what's above. Plain CSS, not a component prop.
+function Field( { children } ) {
+	return <div style={ { marginBottom: '16px' } }>{ children }</div>;
+}
+
 function InventoryApp( { restNamespace } ) {
 	const [ components, setComponents ] = useState( [] );
 	const [ loading, setLoading ] = useState( true );
@@ -303,13 +312,15 @@ function StockModal( { restNamespace, type, components, opKey, onClose, onApplie
 				</div>
 			) ) }
 
-			<TextControl
-				label={ __( 'Note', 'wcbom' ) + ( 'adjust' === type ? ' ' + __( '(required)', 'wcbom' ) : ' ' + __( '(optional)', 'wcbom' ) ) }
-				value={ note }
-				onChange={ setNote }
-				__next40pxDefaultSize
-				__nextHasNoMarginBottom
-			/>
+			<Field>
+				<TextControl
+					label={ __( 'Note', 'wcbom' ) + ( 'adjust' === type ? ' ' + __( '(required)', 'wcbom' ) : ' ' + __( '(optional)', 'wcbom' ) ) }
+					value={ note }
+					onChange={ setNote }
+					__next40pxDefaultSize
+					__nextHasNoMarginBottom
+				/>
+			</Field>
 
 			<p>
 				<Button variant="primary" isBusy={ submitting } disabled={ submitting } onClick={ submit }>
