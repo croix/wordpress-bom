@@ -1,6 +1,6 @@
 # WooCommerce BOM & Stock Manager (`wc-bom-stock`)
 
-WordPress plugin adding Bill-of-Materials and component-level stock management to WooCommerce. Owner: the developer ([redacted]).
+WordPress plugin adding Bill-of-Materials and component-level stock management to WooCommerce. Developer/author name: **Poor Vida** (the plugin's public attribution). The published developer name is Poor Vida; the Progress Log below refers to the developer in the third person.
 
 ## Start here
 
@@ -101,6 +101,13 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Companion-plugin recommendations + developer attribution
+
+- **Developer/author name is now "Poor Vida"** everywhere public-facing: plugin `Author:` header, BUILD_PLAN author line, composer package (`poorvida/wc-bom-stock`). "the developer" in older Progress Log entries refers to the same person and stays as history.
+- **WooCommerce declared as a hard dependency** via the WP 6.5+ `Requires Plugins: woocommerce` header (install-time enforcement with WP-native install links) on top of the existing runtime guard.
+- **EPO + swatches are deliberately recommendations, NOT requirements** (BUILD_PLAN §14.7): the plugin is fully functional without them (swatches = presentation only; EPO = addon-conditional lines only), so blocking activation on them would be wrong. New `Admin\RecommendedPlugins` shows a dismissible notice on the plugins screen / product editor / Inventory page with core-native one-click Install links (or Activate when installed-but-inactive), gated on `install_plugins`, permanently dismissible via option.
+- **Verified live:** deactivated swatches → notice appeared on plugins.php listing *only* swatches (active EPO correctly absent) with a properly nonce'd Activate link; followed the dismiss link → option persisted, notice gone. Environment restored after. (Test-writing note: the first dismiss test silently no-oped because curl was given a relative URL — status 000 means "curl never connected", not "server said no".)
 
 ### 2026-07-30 — Distribution & updates: GitHub-powered update channel built (§14)
 

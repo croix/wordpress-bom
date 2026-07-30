@@ -6,8 +6,9 @@
  * Version:           0.1.0
  * Requires at least: 6.5
  * Requires PHP:      8.1
+ * Requires Plugins:  woocommerce
  * WC requires at least: 8.5
- * Author:            the developer
+ * Author:            Poor Vida
  * Text Domain:       wcbom
  * Domain Path:       /languages
  * Update URI:        https://github.com/croix/wordpress-bom

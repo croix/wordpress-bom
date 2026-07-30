@@ -12,6 +12,7 @@ namespace WCBOM;
 use WCBOM\Admin\DeletionGuard;
 use WCBOM\Admin\InventoryPage;
 use WCBOM\Admin\ProductBomMetabox;
+use WCBOM\Admin\RecommendedPlugins;
 use WCBOM\Admin\Settings;
 use WCBOM\Bom\BomRepository;
 use WCBOM\Bom\ConditionMatcher;
@@ -80,6 +81,7 @@ final class Plugin {
 		( new InventoryPage() )->register();
 		( new Settings() )->register();
 		( new GitHubUpdater() )->register();
+		( new RecommendedPlugins() )->register();
 
 		add_action(
 			'rest_api_init',

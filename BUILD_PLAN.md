@@ -1,7 +1,7 @@
 # WooCommerce BOM & Stock Management Plugin — Build Plan
 
 **Working name:** `wc-bom-stock` (WooCommerce BOM & Stock Manager)
-**Author:** the developer (Sliquid)
+**Author:** Poor Vida
 **Status:** Scoped 2026-07-29, build to run on home machine.
 
 ---
@@ -526,3 +526,8 @@ Built by `bin/build-release-zip.sh` into `dist/` (gitignored). Rooted at **`wc-b
 ### 14.6 Uninstall data policy
 
 Deleting the plugin from wp-admin keeps all data by default — `uninstall.php` only drops the tables when the merchant has explicitly enabled **"Remove all data on uninstall"** (WooCommerce → Settings → Advanced → BOM & Stock, unchecked by default; built 2026-07-30). Deactivate-then-reinstall, updates, and accidental deletions therefore never lose the ledger, BOMs, or manufacture history. The settings text spells out exactly what would be deleted.
+
+### 14.7 Companion-plugin dependencies (added 2026-07-30)
+
+- **WooCommerce is a hard dependency**, declared two ways: the WP 6.5+ `Requires Plugins: woocommerce` header (install-time enforcement — WordPress won't activate us without it and offers an install link), plus the existing runtime guard (admin notice + bail) for older WP.
+- **The customizer companions are recommendations, never requirements.** ThemeHigh EPO (`woo-extra-product-options`) and Variation Swatches (`variation-swatches-woo`) are deliberately NOT in `Requires Plugins`: the plugin is fully functional without them — swatches is purely presentational and EPO only powers addon-conditional BOM lines. `Admin\RecommendedPlugins` shows a dismissible notice (plugins screen, product editor, Inventory page; `install_plugins` capability required) listing whichever is missing, with core's native one-click Install links (or Activate, if installed but inactive). Dismissal is permanent per site via an option.
