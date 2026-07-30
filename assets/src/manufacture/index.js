@@ -18,6 +18,15 @@ function newOpKey() {
 	return window.crypto.randomUUID();
 }
 
+// @wordpress/components' BaseControl no longer applies its own
+// bottom margin (confirmed 0px either way in the currently-targeted WP
+// version), so stacked fields need explicit spacing or their labels
+// visually run into the field above. Plain CSS, not a component prop,
+// so it can't drift with future @wordpress/components changes.
+function Field( { children } ) {
+	return <div style={ { marginBottom: '16px' } }>{ children }</div>;
+}
+
 function formatNumber( n ) {
 	return String( Math.round( n * 10000 ) / 10000 );
 }
@@ -266,98 +275,106 @@ function CreateModal( { restNamespace, onClose, onCreated } ) {
 				</Notice>
 			) }
 
-			<RadioControl
-				label={ __( 'What are you building?', 'wcbom' ) }
-				selected={ mode }
-				options={ [
-					{ label: __( 'Restock an existing manufactured product', 'wcbom' ), value: 'existing' },
-					{ label: __( 'New product from a template', 'wcbom' ), value: 'template' },
-				] }
-				onChange={ setMode }
-			/>
+			<Field>
+				<RadioControl
+					label={ __( 'What are you building?', 'wcbom' ) }
+					selected={ mode }
+					options={ [
+						{ label: __( 'Restock an existing manufactured product', 'wcbom' ), value: 'existing' },
+						{ label: __( 'New product from a template', 'wcbom' ), value: 'template' },
+					] }
+					onChange={ setMode }
+				/>
+			</Field>
 
 			{ 'existing' === mode && (
-				<SelectControl
-					label={ __( 'Product', 'wcbom' ) }
-					value={ productId }
-					options={ [
-						{ label: __( '— choose —', 'wcbom' ), value: '' },
-						...existing.map( ( p ) => ( { label: `${ p.name } (${ p.stock } on hand)`, value: String( p.id ) } ) ),
-					] }
-					onChange={ setProductId }
-					__next40pxDefaultSize
-					__nextHasNoMarginBottom
-				/>
+				<Field>
+					<SelectControl
+						label={ __( 'Product', 'wcbom' ) }
+						value={ productId }
+						options={ [
+							{ label: __( '— choose —', 'wcbom' ), value: '' },
+							...existing.map( ( p ) => ( { label: `${ p.name } (${ p.stock } on hand)`, value: String( p.id ) } ) ),
+						] }
+						onChange={ setProductId }
+						__next40pxDefaultSize
+					/>
+				</Field>
 			) }
 
 			{ 'template' === mode && (
 				<>
-					<SelectControl
-						label={ __( 'Template', 'wcbom' ) }
-						value={ templateId }
-						options={ [
-							{ label: __( '— choose —', 'wcbom' ), value: '' },
-							...templates.map( ( t ) => ( { label: t.name, value: String( t.id ) } ) ),
-						] }
-						onChange={ ( value ) => {
-							setTemplateId( value );
-							setAttributes( {} );
-						} }
-						__next40pxDefaultSize
-						__nextHasNoMarginBottom
-					/>
-
-					{ selectedTemplate && selectedTemplate.attributes.map( ( attr ) => (
+					<Field>
 						<SelectControl
-							key={ attr.taxonomy }
-							label={ attr.label }
-							value={ attributes[ attr.taxonomy ] || '' }
+							label={ __( 'Template', 'wcbom' ) }
+							value={ templateId }
 							options={ [
 								{ label: __( '— choose —', 'wcbom' ), value: '' },
-								...attr.terms.map( ( term ) => ( { label: term.name, value: term.slug } ) ),
+								...templates.map( ( t ) => ( { label: t.name, value: String( t.id ) } ) ),
 							] }
-							onChange={ ( value ) => setAttributes( { ...attributes, [ attr.taxonomy ]: value } ) }
+							onChange={ ( value ) => {
+								setTemplateId( value );
+								setAttributes( {} );
+							} }
 							__next40pxDefaultSize
-							__nextHasNoMarginBottom
 						/>
+					</Field>
+
+					{ selectedTemplate && selectedTemplate.attributes.map( ( attr ) => (
+						<Field key={ attr.taxonomy }>
+							<SelectControl
+								label={ attr.label }
+								value={ attributes[ attr.taxonomy ] || '' }
+								options={ [
+									{ label: __( '— choose —', 'wcbom' ), value: '' },
+									...attr.terms.map( ( term ) => ( { label: term.name, value: term.slug } ) ),
+								] }
+								onChange={ ( value ) => setAttributes( { ...attributes, [ attr.taxonomy ]: value } ) }
+								__next40pxDefaultSize
+							/>
+						</Field>
 					) ) }
 
-					<TextControl
-						label={ __( 'New product title', 'wcbom' ) }
-						value={ title }
-						onChange={ setTitle }
-						__next40pxDefaultSize
-						__nextHasNoMarginBottom
-					/>
-					<TextControl
-						label={ __( 'Price', 'wcbom' ) }
-						type="number"
-						step="0.01"
-						value={ price }
-						onChange={ setPrice }
-						__next40pxDefaultSize
-						__nextHasNoMarginBottom
-					/>
+					<Field>
+						<TextControl
+							label={ __( 'New product title', 'wcbom' ) }
+							value={ title }
+							onChange={ setTitle }
+							__next40pxDefaultSize
+						/>
+					</Field>
+					<Field>
+						<TextControl
+							label={ __( 'Price', 'wcbom' ) }
+							type="number"
+							step="0.01"
+							value={ price }
+							onChange={ setPrice }
+							__next40pxDefaultSize
+						/>
+					</Field>
 				</>
 			) }
 
-			<TextControl
-				label={ __( 'Quantity to build', 'wcbom' ) }
-				type="number"
-				min="1"
-				value={ qtyBuilt }
-				onChange={ setQtyBuilt }
-				__next40pxDefaultSize
-				__nextHasNoMarginBottom
-			/>
+			<Field>
+				<TextControl
+					label={ __( 'Quantity to build', 'wcbom' ) }
+					type="number"
+					min="1"
+					value={ qtyBuilt }
+					onChange={ setQtyBuilt }
+					__next40pxDefaultSize
+				/>
+			</Field>
 
-			<TextControl
-				label={ __( 'Notes (optional)', 'wcbom' ) }
-				value={ notes }
-				onChange={ setNotes }
-				__next40pxDefaultSize
-				__nextHasNoMarginBottom
-			/>
+			<Field>
+				<TextControl
+					label={ __( 'Notes (optional)', 'wcbom' ) }
+					value={ notes }
+					onChange={ setNotes }
+					__next40pxDefaultSize
+				/>
+			</Field>
 
 			<p>
 				<Button variant="primary" isBusy={ submitting } disabled={ submitting } onClick={ submit }>
@@ -434,12 +451,13 @@ function CompleteModal( { restNamespace, order, onClose, onCompleted } ) {
 					<Notice status="warning" isDismissible={ false }>
 						{ __( 'One or more components are short. Building anyway will take that component negative.', 'wcbom' ) }
 					</Notice>
-					<CheckboxControl
-						label={ __( 'Build anyway (allow negative stock)', 'wcbom' ) }
-						checked={ allowNegative }
-						onChange={ setAllowNegative }
-						__nextHasNoMarginBottom
-					/>
+					<Field>
+						<CheckboxControl
+							label={ __( 'Build anyway (allow negative stock)', 'wcbom' ) }
+							checked={ allowNegative }
+							onChange={ setAllowNegative }
+						/>
+					</Field>
 				</>
 			) }
 
@@ -499,27 +517,30 @@ function ReverseModal( { restNamespace, order, onClose, onReversed } ) {
 				</Notice>
 			) }
 
-			<TextControl
-				label={ sprintf( __( 'Units to reverse (max %d)', 'wcbom' ), order.remaining ) }
-				type="number"
-				min="1"
-				max={ order.remaining }
-				value={ qty }
-				onChange={ setQty }
-				__next40pxDefaultSize
-				__nextHasNoMarginBottom
-			/>
+			<Field>
+				<TextControl
+					label={ sprintf( __( 'Units to reverse (max %d)', 'wcbom' ), order.remaining ) }
+					type="number"
+					min="1"
+					max={ order.remaining }
+					value={ qty }
+					onChange={ setQty }
+					__next40pxDefaultSize
+				/>
+			</Field>
 
 			<p><strong>{ __( 'Scrap (check any component that was NOT recoverable and should not be restored):', 'wcbom' ) }</strong></p>
-			{ order.items.map( ( item ) => (
-				<CheckboxControl
-					key={ item.component_id }
-					label={ `${ item.name } (${ formatNumber( item.qty_per_unit ) } ${ item.unit }/unit)` }
-					checked={ !! scrap[ item.component_id ] }
-					onChange={ ( checked ) => setScrap( { ...scrap, [ item.component_id ]: checked } ) }
-					__nextHasNoMarginBottom
-				/>
-			) ) }
+			<div style={ { marginBottom: '16px' } }>
+				{ order.items.map( ( item ) => (
+					<div key={ item.component_id } style={ { marginBottom: '8px' } }>
+						<CheckboxControl
+							label={ `${ item.name } (${ formatNumber( item.qty_per_unit ) } ${ item.unit }/unit)` }
+							checked={ !! scrap[ item.component_id ] }
+							onChange={ ( checked ) => setScrap( { ...scrap, [ item.component_id ]: checked } ) }
+						/>
+					</div>
+				) ) }
+			</div>
 
 			<p>
 				<Button variant="primary" isBusy={ submitting } disabled={ submitting } onClick={ submit }>
