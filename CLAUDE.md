@@ -124,7 +124,7 @@ The next `phpunit` run recreates all tables (`WC_Install::install()` + `Schema::
 - [x] Phase 4: manufacture orders (build/reverse) — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 4.5: BOM-derived shipping weight & add-on surcharges — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 5: reports, import/export, REST, CLI — **done and verified 2026-07-30, see Progress Log**
-- [ ] Phase 6: hardening, tests, release prep — **in progress**: UI/cosmetic pass, PHPUnit suite (full §9 checklist), HPOS + blocks/shortcode checkout matrix, and uninstall data-policy re-verify all done (two real bugs found and fixed along the way — see Progress Log); remaining: readme.txt + i18n/POT, §12 dependency version check-in
+- [ ] Phase 6: hardening, tests, release prep — **in progress**: UI/cosmetic pass, PHPUnit suite (full §9 checklist), HPOS + blocks/shortcode checkout matrix, uninstall data-policy re-verify, and readme.txt + i18n/POT all done (two real bugs found and fixed along the way — see Progress Log); remaining: §12 dependency version check-in
 
 Update this checklist as phases complete. Remaining open decisions are in BUILD_PLAN.md §11.
 
@@ -133,6 +133,12 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Phase 6: readme.txt written; i18n/POT check clean
+
+Added a standard WordPress-plugin-format `readme.txt` (Contributors/Tags/Requires headers, Description, Installation, FAQ, Changelog) — not for wordpress.org hosting (repo stays private, distribution is the GitHub-release channel per §14), but because it's the conventional companion file WP tooling expects and it's the accurate, current feature list in one place. Added it to `bin/build-release-zip.sh`'s shipped file list (it wasn't included in release zips before).
+
+**i18n check:** ran `wp i18n make-pot` against the plugin (via `tests-cli`'s real WP-CLI, matching `Text Domain: wcbom` / `Domain Path: /languages` from the plugin header) — it flagged 8 JS strings with `sprintf()` placeholders but no `/* translators: */` comment (component-picker.js, inventory/index.js, manufacture/index.js), plus one with unordered multi-placeholders (`%d — %s` instead of numbered `%1$d — %2$s`, which forces a fixed word order on every translation). Fixed all 8; re-ran `make-pot` clean (zero warnings). **POT generation is deliberately not wired into the CI release workflow** — it needs a real WP-CLI/WordPress context to run (`wp i18n make-pot` is a WP-CLI command, not a standalone Node/Composer tool), and standing up a full WP instance in GitHub Actions just for this would be disproportionate tooling weight for a plugin with no translators yet. `languages/*.pot` stays gitignored (already was) and any contributor can regenerate it on demand exactly as done here, in a few seconds, whenever it's actually needed.
 
 ### 2026-07-30 — Phase 6: uninstall data-policy re-verified — `wcbom_ops` table was missing from the purge list
 

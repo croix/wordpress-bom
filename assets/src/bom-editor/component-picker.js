@@ -70,7 +70,11 @@ export default function ComponentPicker( { restNamespace, value, onSelect, onCle
 			/>
 			{ term && ! searching && options.length === 0 && (
 				<Button variant="link" onClick={ createComponent }>
-					{ sprintf( __( '+ Create component "%s"', 'wcbom' ), term ) }
+					{ sprintf(
+					/* translators: %s: the search term typed, offered as a new component name */
+					__( '+ Create component "%s"', 'wcbom' ),
+					term
+				) }
 				</Button>
 			) }
 		</>

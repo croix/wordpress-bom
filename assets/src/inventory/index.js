@@ -136,7 +136,11 @@ function InventoryApp( { restNamespace } ) {
 						disabled={ selectedComponents.length === 0 }
 						onClick={ openReceive }
 					>
-						{ sprintf( __( 'Receive selected (%d)', 'wcbom' ), selectedComponents.length ) }
+						{ sprintf(
+							/* translators: %d: number of components selected to receive */
+							__( 'Receive selected (%d)', 'wcbom' ),
+							selectedComponents.length
+						) }
 					</Button>
 				</p>
 
@@ -179,7 +183,11 @@ function InventoryApp( { restNamespace } ) {
 									<td>
 										{ c.stock } { c.unit }
 									</td>
-									<td>{ sprintf( __( '%d BOM(s)', 'wcbom' ), c.used_in_count ) }</td>
+									<td>{ sprintf(
+										/* translators: %d: number of active BOMs this component is used in */
+										__( '%d BOM(s)', 'wcbom' ),
+										c.used_in_count
+									) }</td>
 									<td>
 										{ c.last_movement
 											? `${ c.last_movement.reason } (${ c.last_movement.delta > 0 ? '+' : '' }${ formatNumber( c.last_movement.delta ) })`

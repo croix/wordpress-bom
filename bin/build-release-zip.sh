@@ -38,7 +38,7 @@ rm -rf dist
 mkdir -p "$STAGE"
 
 # Runtime files only.
-cp wc-bom-stock.php uninstall.php "$STAGE/"
+cp wc-bom-stock.php uninstall.php readme.txt "$STAGE/"
 cp -R src "$STAGE/src"
 mkdir -p "$STAGE/assets"
 cp -R assets/build "$STAGE/assets/build"

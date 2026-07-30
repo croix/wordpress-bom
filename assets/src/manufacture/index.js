@@ -411,7 +411,11 @@ function CompleteModal( { restNamespace, order, onClose, onCompleted } ) {
 	}
 
 	return (
-		<Modal title={ sprintf( __( 'Complete MO #%d', 'wcbom' ), order.mo_id ) } onRequestClose={ onClose }>
+		<Modal title={ sprintf(
+			/* translators: %d: manufacture order ID */
+			__( 'Complete MO #%d', 'wcbom' ),
+			order.mo_id
+		) } onRequestClose={ onClose }>
 			{ error && (
 				<Notice status="error" isDismissible={ false }>
 					{ error }
@@ -488,7 +492,11 @@ function ReverseModal( { restNamespace, order, onClose, onReversed } ) {
 	function submit() {
 		const parsedQty = parseInt( qty, 10 );
 		if ( ! parsedQty || parsedQty < 1 || parsedQty > order.remaining ) {
-			setError( sprintf( __( 'Enter between 1 and %d unit(s).', 'wcbom' ), order.remaining ) );
+			setError( sprintf(
+				/* translators: %d: maximum number of units still available to reverse */
+				__( 'Enter between 1 and %d unit(s).', 'wcbom' ),
+				order.remaining
+			) );
 			return;
 		}
 
@@ -510,7 +518,11 @@ function ReverseModal( { restNamespace, order, onClose, onReversed } ) {
 	}
 
 	return (
-		<Modal title={ sprintf( __( 'Reverse MO #%d', 'wcbom' ), order.mo_id ) } onRequestClose={ onClose }>
+		<Modal title={ sprintf(
+			/* translators: %d: manufacture order ID */
+			__( 'Reverse MO #%d', 'wcbom' ),
+			order.mo_id
+		) } onRequestClose={ onClose }>
 			{ error && (
 				<Notice status="error" isDismissible={ false }>
 					{ error }
@@ -519,7 +531,11 @@ function ReverseModal( { restNamespace, order, onClose, onReversed } ) {
 
 			<Field>
 				<TextControl
-					label={ sprintf( __( 'Units to reverse (max %d)', 'wcbom' ), order.remaining ) }
+					label={ sprintf(
+						/* translators: %d: maximum number of units still available to reverse */
+						__( 'Units to reverse (max %d)', 'wcbom' ),
+						order.remaining
+					) }
 					type="number"
 					min="1"
 					max={ order.remaining }
@@ -556,7 +572,12 @@ function ReverseModal( { restNamespace, order, onClose, onReversed } ) {
 
 function ViewModal( { order, onClose } ) {
 	return (
-		<Modal title={ sprintf( __( 'MO #%d — %s', 'wcbom' ), order.mo_id, order.product_name ) } onRequestClose={ onClose }>
+		<Modal title={ sprintf(
+			/* translators: 1: manufacture order ID, 2: finished product name */
+			__( 'MO #%1$d — %2$s', 'wcbom' ),
+			order.mo_id,
+			order.product_name
+		) } onRequestClose={ onClose }>
 			<p>
 				{ STATUS_LABELS[ order.status ] || order.status } — { __( 'built', 'wcbom' ) } { order.qty_built }, { __( 'reversed', 'wcbom' ) } { order.qty_reversed }
 			</p>
