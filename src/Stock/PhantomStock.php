@@ -11,6 +11,7 @@ namespace WCBOM\Stock;
 
 use WC_Product;
 use WCBOM\Bom\BomRepository;
+use WCBOM\Bom\ProductMode;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -27,6 +28,25 @@ defined( 'ABSPATH' ) || exit;
  * manually editing a component's stock on its own Inventory tab. Without
  * it the cache would only ever reflect ledgered changes, silently going
  * stale on the single most common real-world stock edit.
+ *
+ * Invalidate() also mirrors the freshly computed number into the
+ * product's REAL `_stock`/`_manage_stock`/`_stock_status` postmeta, not
+ * just the transient Stock\StorefrontStock's PHP-object filters expose.
+ * Found via a real Blocks-checkout test (BUILD_PLAN.md §8 Phase 6 HPOS/
+ * checkout matrix): WooCommerce's modern stock-reservation system
+ * (`Checkout\Helpers\ReserveStock`, used by the Store API/Blocks
+ * checkout to prevent overselling under concurrent checkouts) queries
+ * `_stock` directly via raw SQL — entirely bypassing the PHP object/
+ * filter layer — so a made-to-order product whose real postmeta was
+ * never updated (only ever faked at the filter level) was rejected by
+ * every Blocks checkout with "not enough stock", even with plenty of
+ * buildable components. The classic shortcode checkout doesn't hit this
+ * (no raw-SQL reservation step), which is why it went undetected until
+ * a real browser checkout was tried. Mirroring is gated to
+ * ProductMode::MADE_TO_ORDER only — products_with_always_line() also
+ * matches MANUFACTURED products (their recipe is an active BOM too), and
+ * those carry a real, ManufactureService-controlled stock count that
+ * must never be overwritten by a phantom number.
  */
 final class PhantomStock {
 
@@ -87,13 +107,43 @@ final class PhantomStock {
 	 */
 	public function invalidate( int $product_id ): void {
 		delete_transient( self::CACHE_KEY_PREFIX . $product_id );
+		$this->sync_real_stock( $product_id );
 
 		$product = wc_get_product( $product_id );
 		if ( $product instanceof \WC_Product_Variable ) {
 			foreach ( $product->get_children() as $variation_id ) {
 				delete_transient( self::CACHE_KEY_PREFIX . $variation_id );
+				$this->sync_real_stock( $variation_id );
 			}
 		}
+	}
+
+	/**
+	 * Mirrors the computed buildable qty into real postmeta for
+	 * made-to-order products/variations only — see class docblock.
+	 * Writes postmeta directly (not via wc_update_product_stock()/
+	 * WC_Product::save()) so this cache-mirror write doesn't fire
+	 * WooCommerce's own product-updated hooks/webhooks, which are meant
+	 * for real inventory changes.
+	 *
+	 * @param int $product_id Product or variation ID.
+	 */
+	private function sync_real_stock( int $product_id ): void {
+		if ( ProductMode::MADE_TO_ORDER !== ProductMode::resolve( $product_id ) ) {
+			return;
+		}
+
+		$qty = $this->compute( $product_id );
+
+		update_post_meta( $product_id, '_stock', $qty );
+		update_post_meta( $product_id, '_manage_stock', 'yes' );
+		update_post_meta( $product_id, '_stock_status', $qty > 0 ? 'instock' : 'outofstock' );
+		wc_delete_product_transients( $product_id );
+
+		// Repopulate the buildable-qty cache with the value just computed,
+		// so the next get_buildable_qty() call doesn't immediately recompute
+		// the same thing invalidate() just cleared.
+		set_transient( self::CACHE_KEY_PREFIX . $product_id, $qty, 0 );
 	}
 
 	/**
