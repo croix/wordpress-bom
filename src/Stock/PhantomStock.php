@@ -75,12 +75,25 @@ final class PhantomStock {
 	}
 
 	/**
-	 * Clears one product's cached buildable quantity.
+	 * Clears one product's cached buildable quantity, and cascades to its
+	 * variation children if it's a variable product. Variations fall back
+	 * to the parent's BOM (compute()) but are cached under their own
+	 * product ID, so a variation's cache entry — once computed — would
+	 * otherwise never be refreshed by a parent-level BOM or component
+	 * change; only its own direct invalidation call would catch it, and
+	 * nothing makes that call today.
 	 *
 	 * @param int $product_id Product/variation ID.
 	 */
 	public function invalidate( int $product_id ): void {
 		delete_transient( self::CACHE_KEY_PREFIX . $product_id );
+
+		$product = wc_get_product( $product_id );
+		if ( $product instanceof \WC_Product_Variable ) {
+			foreach ( $product->get_children() as $variation_id ) {
+				delete_transient( self::CACHE_KEY_PREFIX . $variation_id );
+			}
+		}
 	}
 
 	/**

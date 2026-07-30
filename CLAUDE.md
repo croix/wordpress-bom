@@ -103,6 +103,16 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
 
+### 2026-07-30 — Bug fix: PhantomStock cache didn't cascade to variation children (found via live storefront check)
+
+Before starting Phase 4.5, the developer reported the Custom 24oz Tumbler's variation swatches were no longer selectable on the storefront. Investigation (browser + `wp eval`):
+
+- Every variation's `data-product_variations` JSON showed `is_in_stock: false`, `max_qty` effectively 0 — but every component (blanks, epoxy, caps, glitter, straws) had plenty of real stock (100/200/300/500/50). Calling `PhantomStock::get_buildable_qty()` directly for the same IDs returned the correct 40 once their transients were cleared — so the *computation* was right; the *cached value* was wrong and stuck.
+- **Root cause:** `PhantomStock::invalidate($product_id)` only ever cleared the transient for the exact ID it was given. `BomRepository::products_with_always_line()` (used by `handle_stock_adjusted()`) and `wcbom_bom_saved` both fire with the **parent** product ID only — never a variable product's variation children. But `get_buildable_qty()` caches under **each variation's own product ID** (falling back to the parent's BOM only for the *computation*, not the *cache key*). Net effect: once a variation's cache entry got computed once — e.g. while stock was legitimately short during a test, or before its BOM/mode was fully wired up — nothing ever invalidated it again. Every later component restock or BOM save correctly refreshed the parent's own cache (which is why the headline price-range/product-level data looked fine) but silently left each variation's stale number in place forever. Confirmed by reproduction: manually poisoning `wcbom_buildable_82`/`_83` to 0, then calling `invalidate(81)` (exactly what a BOM save does) — the poisoned entries survived untouched.
+- **Fix** ([src/Stock/PhantomStock.php](src/Stock/PhantomStock.php)): `invalidate()` now checks if the product is a `WC_Product_Variable` and also clears every child variation's transient. Single-method fix, no schema/migration needed. Verified live: reproduced the poisoned-cache scenario, confirmed the old code left it broken, confirmed the patched `invalidate()` fixes it, then reloaded the actual storefront page fresh — swatches now select correctly, price/stock update, Add to cart enables. PHPCS/PHPStan clean on the full tree; `debug.log` stayed empty throughout.
+- Also cleaned up 11 orphaned `wcbom_buildable_*` transients left over from deleted test products (harmless — nothing reads a transient for a nonexistent product ID — but confirms cache entries have no lifecycle tie to product deletion either; not fixed, since deleted products can't be visited so a dangling entry is inert, unlike the variation bug above which was reachable and user-visible).
+- **Not yet done:** committing this fix (working tree has the one-file change pending) and resuming Phase 4.5.
+
 ### 2026-07-30 — Phase 4 complete: manufacture orders (build/reverse), verified end-to-end
 
 **What was built** (per BUILD_PLAN §5.4/§13.6 — the exact scenario from the original brief):
