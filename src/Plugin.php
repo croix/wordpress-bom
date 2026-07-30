@@ -16,11 +16,13 @@ use WCBOM\Admin\RecommendedPlugins;
 use WCBOM\Admin\Settings;
 use WCBOM\Bom\BomRepository;
 use WCBOM\Bom\ConditionMatcher;
+use WCBOM\Install\SampleData;
 use WCBOM\Integrations\ThemeHighEpo;
 use WCBOM\Orders\OrderSync;
 use WCBOM\Orders\RefundHandler;
 use WCBOM\Rest\Api;
 use WCBOM\Rest\InventoryApi;
+use WCBOM\Rest\SampleDataApi;
 use WCBOM\Stock\Ledger;
 use WCBOM\Stock\OperationGuard;
 use WCBOM\Stock\PhantomStock;
@@ -88,6 +90,7 @@ final class Plugin {
 			static function () use ( $boms, $stock, $guard ) {
 				( new Api( $boms ) )->register_routes();
 				( new InventoryApi( $stock, $boms, $guard ) )->register_routes();
+				( new SampleDataApi( new SampleData() ) )->register_routes();
 			}
 		);
 

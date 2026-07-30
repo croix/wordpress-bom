@@ -138,7 +138,12 @@ final class InventoryApi {
 			);
 		}
 
-		return new WP_REST_Response( array( 'components' => $results ) );
+		return new WP_REST_Response(
+			array(
+				'components'            => $results,
+				'sample_data_installed' => ( new \WCBOM\Install\SampleData() )->is_installed(),
+			)
+		);
 	}
 
 	/**

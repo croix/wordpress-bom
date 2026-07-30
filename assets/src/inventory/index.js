@@ -27,14 +27,36 @@ function InventoryApp( { restNamespace } ) {
 	const [ selected, setSelected ] = useState( {} );
 	const [ notice, setNotice ] = useState( null );
 	const [ modal, setModal ] = useState( null ); // { type: 'receive'|'count'|'adjust', components: [...] }
+	const [ samplesInstalled, setSamplesInstalled ] = useState( false );
+	const [ sampleBusy, setSampleBusy ] = useState( false );
 
 	const load = useCallback( () => {
 		setLoading( true );
 		apiFetch( { path: `/${ restNamespace }/inventory${ search ? `?search=${ encodeURIComponent( search ) }` : '' }` } )
-			.then( ( response ) => setComponents( response.components ) )
+			.then( ( response ) => {
+				setComponents( response.components );
+				setSamplesInstalled( !! response.sample_data_installed );
+			} )
 			.catch( ( err ) => setNotice( { status: 'error', message: err.message || String( err ) } ) )
 			.finally( () => setLoading( false ) );
 	}, [ restNamespace, search ] );
+
+	function runSampleAction( action ) {
+		setSampleBusy( true );
+		apiFetch( { path: `/${ restNamespace }/sample-data/${ action }`, method: 'POST' } )
+			.then( () => {
+				setNotice( {
+					status: 'success',
+					message:
+						'install' === action
+							? __( 'Sample products installed. They are visible on your storefront until removed.', 'wcbom' )
+							: __( 'Sample products removed.', 'wcbom' ),
+				} );
+				load();
+			} )
+			.catch( ( err ) => setNotice( { status: 'error', message: err.message || String( err ) } ) )
+			.finally( () => setSampleBusy( false ) );
+	}
 
 	useEffect( load, [ load ] );
 
@@ -109,6 +131,15 @@ function InventoryApp( { restNamespace } ) {
 					</Button>
 				</p>
 
+				{ ! loading && components.length === 0 && ! search && (
+					<Notice status="info" isDismissible={ false }>
+						{ __( 'No components yet. You can install a sample tumbler catalog (components, a premade product, and a customizable made-to-order product with a working BOM) to explore how everything fits together. Sample products are visible on your storefront and can be removed with one click.', 'wcbom' ) }{ ' ' }
+						<Button variant="primary" isBusy={ sampleBusy } disabled={ sampleBusy } onClick={ () => runSampleAction( 'install' ) }>
+							{ __( 'Install sample products', 'wcbom' ) }
+						</Button>
+					</Notice>
+				) }
+
 				{ loading ? (
 					<Spinner />
 				) : (
@@ -157,6 +188,14 @@ function InventoryApp( { restNamespace } ) {
 							) ) }
 						</tbody>
 					</table>
+				) }
+
+				{ samplesInstalled && (
+					<p>
+						<Button variant="tertiary" isDestructive isBusy={ sampleBusy } disabled={ sampleBusy } onClick={ () => runSampleAction( 'remove' ) }>
+							{ __( 'Remove sample products', 'wcbom' ) }
+						</Button>
+					</p>
 				) }
 			</CardBody>
 

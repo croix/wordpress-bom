@@ -102,6 +102,15 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
 
+### 2026-07-30 — Sample data as a shipping feature (install/remove from the Inventory screen)
+
+the developer asked whether the fixture data is open source / packageable. **Answer: it's entirely original content authored for this plugin** (every product name, price, quantity, and recipe — nothing borrowed from WooCommerce's sample data or anywhere else; no images shipped, the admin placeholder is WooCommerce's own), so it's freely packageable under the plugin's GPL-2.0-or-later license.
+
+- **Refactor:** all seeding logic moved from `Cli\Commands` into a shared `Install\SampleData` service (`is_installed()` / `install()` / `remove()`, products flagged with `_wcbom_fixture` meta). `wp wcbom seed [--reset]` is now a thin delegating wrapper — behavior unchanged.
+- **New:** `Rest\SampleDataApi` (`POST /sample-data/{install,remove}`, `manage_woocommerce`; install 409s when samples exist — naturally idempotent, no op_key needed) and Inventory-screen UI: an empty component list (no search) offers "Install sample products" with copy warning that samples are storefront-visible; a "Remove sample products" button appears whenever samples are installed (`sample_data_installed` flag added to `GET /inventory`).
+- **Real bug found by the verification, fixed:** `remove()` deleted products directly, but Phase 1's `DeletionGuard` (correctly) blocks deleting any product referenced by an active BOM — the sample blank tumbler is exactly that, so removal `wp_die`'d mid-request having removed nothing. Latent since Phase 1 because no `--reset` had run since the guard landed. **Fix: delete the sample products' own BOMs first, then the products** (guard then passes); and if sample components appear in the *merchant's own* active BOMs, refuse with a clear 409 naming those products rather than breaking their recipes.
+- Verified end-to-end: REST remove (12 products gone, list empty, flag false) → REST install (fresh catalog, new IDs) → `wp wcbom seed --reset` (CLI remove+install both fine). debug.log clean.
+
 ### 2026-07-30 — Companion-plugin recommendations + developer attribution
 
 - **Developer/author name is now "Poor Vida"** everywhere public-facing: plugin `Author:` header, BUILD_PLAN author line, composer package (`poorvida/wc-bom-stock`). "the developer" in older Progress Log entries refers to the same person and stays as history.
