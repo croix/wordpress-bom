@@ -53,7 +53,7 @@ final class RecommendedPlugins {
 		}
 
 		$screen = get_current_screen();
-		if ( ! $screen || ! in_array( $screen->id, array( 'plugins', 'woocommerce_page_wcbom-inventory', 'product' ), true ) ) {
+		if ( ! $screen || ! in_array( $screen->id, array( 'plugins', 'toplevel_page_' . PluginMenu::SLUG, 'product' ), true ) ) {
 			return;
 		}
 

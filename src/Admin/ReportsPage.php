@@ -1,6 +1,6 @@
 <?php
 /**
- * "WooCommerce → Reports" admin page.
+ * "BOM & Stock → Reports" admin page.
  *
  * @package WCBOM
  */
@@ -22,7 +22,15 @@ defined( 'ABSPATH' ) || exit;
  */
 final class ReportsPage {
 
-	private const HOOK_SUFFIX = 'woocommerce_page_wcbom-reports';
+	/**
+	 * The hook suffix WordPress assigns this submenu, captured from
+	 * add_submenu_page()'s return value — see Admin\ManufacturePage's
+	 * docblock on the same property for why this can't be hand-computed
+	 * from the parent slug.
+	 *
+	 * @var string|false|null
+	 */
+	private $hook_suffix;
 
 	/**
 	 * Hooks the admin menu and enqueue callbacks.
@@ -33,11 +41,11 @@ final class ReportsPage {
 	}
 
 	/**
-	 * Adds the page under the WooCommerce admin menu.
+	 * Adds the page under the plugin's own top-level menu.
 	 */
 	public function add_menu_page(): void {
-		add_submenu_page(
-			'woocommerce',
+		$this->hook_suffix = add_submenu_page(
+			PluginMenu::SLUG,
 			__( 'Reports', 'wcbom' ),
 			__( 'Reports', 'wcbom' ),
 			'manage_woocommerce',
@@ -88,7 +96,7 @@ final class ReportsPage {
 	 * @param string $hook Current admin page hook suffix.
 	 */
 	public function enqueue( string $hook ): void {
-		if ( self::HOOK_SUFFIX !== $hook ) {
+		if ( $this->hook_suffix !== $hook ) {
 			return;
 		}
 

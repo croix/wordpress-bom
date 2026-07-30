@@ -1,6 +1,6 @@
 <?php
 /**
- * "WooCommerce → Endpoints" admin page.
+ * "BOM & Stock → Endpoints" admin page.
  *
  * @package WCBOM
  */
@@ -65,11 +65,11 @@ final class EndpointsPage {
 	}
 
 	/**
-	 * Adds the page under the WooCommerce admin menu.
+	 * Adds the page under the plugin's own top-level menu.
 	 */
 	public function add_menu_page(): void {
 		add_submenu_page(
-			'woocommerce',
+			PluginMenu::SLUG,
 			__( 'Endpoints', 'wcbom' ),
 			__( 'Endpoints', 'wcbom' ),
 			'manage_woocommerce',

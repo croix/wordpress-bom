@@ -219,7 +219,7 @@ For made-to-order products, displayed/purchasable stock =
 
 ### 5.4 Manufacture Orders
 
-Admin screen: **WooCommerce → Manufacturing**.
+Admin screen: **BOM & Stock → Manufacturing** (own top-level admin menu, not WooCommerce's — see §14.8).
 
 Create MO flow:
 1. Pick what to build:
@@ -253,7 +253,7 @@ Glitter isn't consumed in "each" — it's grams. WC stock is integer by default:
 
 ### 5.7 Inventory management screen (receive / count / adjust) — added 2026-07-30
 
-**WooCommerce → Inventory** (React admin page): every component's stock managed from one place — never open a product edit screen to change inventory. Three distinct workflows, each writing its own ledger reason so reports stay meaningful:
+**BOM & Stock → Inventory** (React admin page, own top-level menu): every component's stock managed from one place — never open a product edit screen to change inventory. Three distinct workflows, each writing its own ledger reason so reports stay meaningful:
 
 | Action | Input | Ledger reason | Semantics |
 |---|---|---|---|
@@ -370,7 +370,7 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 - ✅ Demo: set blanks to 3 → made-to-order product shows 3 available; buy 3 → out of stock; upgraded-straw stock 0 → only that option blocked.
 
 ### Phase 3.5 — Inventory management screen (~1–2 days, added 2026-07-30)
-- **WooCommerce → Inventory** React page per §5.7: all components in one table, Receive / Count / Adjust row actions + receiving-session bulk entry, everything through `StockService` with the new `received`/`cycle_count` ledger reasons.
+- **BOM & Stock → Inventory** React page per §5.7: all components in one table, Receive / Count / Adjust row actions + receiving-session bulk entry, everything through `StockService` with the new `received`/`cycle_count` ledger reasons.
 - ✅ Demo: receive 50 blanks without touching the product edit screen → stock +50, ledger row, buildable count updates; cycle-count glitter at 480 g against a system 500 g → drift −20 shown and ledgered.
 
 ### Phase 4 — Manufacture orders (~3–4 days)
@@ -559,9 +559,18 @@ Built by `bin/build-release-zip.sh` into `dist/` (gitignored). Rooted at **`wc-b
 
 ### 14.6 Uninstall data policy
 
-Deleting the plugin from wp-admin keeps all data by default — `uninstall.php` only drops the tables when the merchant has explicitly enabled **"Remove all data on uninstall"** (WooCommerce → Settings → Advanced → BOM & Stock, unchecked by default; built 2026-07-30). Deactivate-then-reinstall, updates, and accidental deletions therefore never lose the ledger, BOMs, or manufacture history. The settings text spells out exactly what would be deleted.
+Deleting the plugin from wp-admin keeps all data by default — `uninstall.php` only drops the tables when the merchant has explicitly enabled **"Remove all data on uninstall"** (BOM & Stock → Settings, unchecked by default; built 2026-07-30, moved off the WooCommerce Advanced tab 2026-07-30 — see §14.8). Deactivate-then-reinstall, updates, and accidental deletions therefore never lose the ledger, BOMs, or manufacture history. The settings text spells out exactly what would be deleted.
 
 ### 14.7 Companion-plugin dependencies (added 2026-07-30)
 
 - **WooCommerce is a hard dependency**, declared two ways: the WP 6.5+ `Requires Plugins: woocommerce` header (install-time enforcement — WordPress won't activate us without it and offers an install link), plus the existing runtime guard (admin notice + bail) for older WP.
 - **The customizer companions are recommendations, never requirements.** ThemeHigh EPO (`woo-extra-product-options`) and Variation Swatches (`variation-swatches-woo`) are deliberately NOT in `Requires Plugins`: the plugin is fully functional without them — swatches is purely presentational and EPO only powers addon-conditional BOM lines. `Admin\RecommendedPlugins` shows a dismissible notice (plugins screen, product editor, Inventory page; `install_plugins` capability required) listing whichever is missing, with core's native one-click Install links (or Activate, if installed but inactive). Dismissal is permanent per site via an option.
+
+### 14.8 Own top-level admin menu, not WooCommerce's (added 2026-07-30)
+
+Through Phase 5, every admin screen (Inventory, Manufacturing, Reports, Endpoints) lived under WooCommerce's own menu (`add_submenu_page('woocommerce', ...)`), and Settings lived inside WooCommerce → Settings → Advanced as a "BOM & Stock" tab section. the developer asked for all of it consolidated into the plugin's own top-level menu instead, separate from WooCommerce's.
+
+- **New `Admin\PluginMenu`** registers a single top-level "BOM & Stock" menu (slug `wcbom`, `dashicons-archive`, position 56 — just below WooCommerce). Every page class now parents its `add_submenu_page()` call to `PluginMenu::SLUG` instead of `'woocommerce'`. `Admin\InventoryPage` additionally uses `PluginMenu::SLUG` as **its own** slug too (not just its parent's) — WordPress's standard technique for making the top-level menu link itself open a specific page, instead of a generic duplicate first entry — so clicking "BOM & Stock" lands directly on Inventory.
+- **Settings moved off the WooCommerce tab entirely.** New `Admin\SettingsPage` is a plain submenu page reusing WooCommerce's own field renderer/saver directly (`woocommerce_admin_fields()` / `WC_Admin_Settings::save_fields()`) — both are plain static helpers with zero dependency on the `WC_Settings_Page` tab-registration system, so they work standalone with our own `<form>`/nonce exactly as well as inside a real WC settings tab. `save_fields()` does no nonce/capability check itself (that's normally the tab system's job), so `SettingsPage` adds its own `check_admin_referer()`. Same two settings (uninstall data policy, low-stock digest enable/email), same option keys — only the page location changed.
+- **Real bug found by testing, not by reasoning about the code:** the three React-app pages (Manufacturing, Reports) went blank ("Loading…" forever) after the move. Root cause: their `admin_enqueue_scripts` gate compared the current hook against a hand-computed string assumed to be `{parent_slug}_page_{submenu_slug}` — but WordPress's actual hook-suffix algorithm (`get_plugin_page_hookname()`) prefixes with `sanitize_title()` of the parent menu's **display title**, not its slug, via a core global (`$admin_page_hooks[$parent_slug] = sanitize_title($menu_title)`, set inside `add_menu_page()`). WooCommerce's own menu title is literally "WooCommerce" → sanitizes to `woocommerce`, matching its slug and masking this entirely; our menu's title "BOM & Stock" sanitizes to `bom-stock` ≠ slug `wcbom`, so the hand-computed guess was wrong. **Fixed** by capturing `add_submenu_page()`'s own return value (the exact, correct hook suffix) in an instance property instead of ever hand-computing it — applied to all three page classes (Inventory's happened to still be correct by luck of the `toplevel_page_{slug}` special case, but was changed too for consistency). `Admin\RecommendedPlugins`'s screen-ID check for showing the companion-plugin notice on the Inventory page was updated to the new `toplevel_page_wcbom` screen ID too.
+- Verified end-to-end in wp-env: new menu shows all five pages in the right order and landing on Inventory; WooCommerce's own menu no longer lists Inventory/Manufacturing/Endpoints; WooCommerce → Settings → Advanced no longer has a "BOM & Stock" tab; the Settings page saves for real through the actual UI (not simulated) and the low-stock digest cron event schedules/unschedules correctly off that real save; Manufacturing and Reports both render their React apps correctly after the hook-suffix fix; the product-edit BOM tab (a separate, unrelated mechanism) is confirmed unaffected. PHPCS/PHPStan clean; `debug.log` stayed empty throughout.

@@ -14,10 +14,11 @@ use WCBOM\Admin\EndpointsPage;
 use WCBOM\Admin\ImportExportHandlers;
 use WCBOM\Admin\InventoryPage;
 use WCBOM\Admin\ManufacturePage;
+use WCBOM\Admin\PluginMenu;
 use WCBOM\Admin\ProductBomMetabox;
 use WCBOM\Admin\RecommendedPlugins;
 use WCBOM\Admin\ReportsPage;
-use WCBOM\Admin\Settings;
+use WCBOM\Admin\SettingsPage;
 use WCBOM\Bom\BomCsv;
 use WCBOM\Bom\BomRepository;
 use WCBOM\Bom\ConditionMatcher;
@@ -108,13 +109,14 @@ final class Plugin {
 		$phantom->register();
 		( new StorefrontStock( $phantom, $boms, $matcher ) )->register();
 		( new CartPricing( $boms, $matcher ) )->register();
+		( new PluginMenu() )->register();
 		( new InventoryPage() )->register();
 		( new ManufacturePage() )->register();
 		( new ReportsPage() )->register();
 		( new EndpointsPage() )->register();
 		( new ImportExportHandlers( $bom_csv, $ledger ) )->register();
 		( new LowStockDigest( $low_stock_report ) )->register();
-		( new Settings() )->register();
+		( new SettingsPage() )->register();
 		( new GitHubUpdater() )->register();
 		( new RecommendedPlugins() )->register();
 

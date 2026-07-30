@@ -1,6 +1,6 @@
 <?php
 /**
- * "WooCommerce → Manufacturing" admin page.
+ * "BOM & Stock → Manufacturing" admin page.
  *
  * @package WCBOM
  */
@@ -17,7 +17,18 @@ defined( 'ABSPATH' ) || exit;
  */
 final class ManufacturePage {
 
-	private const HOOK_SUFFIX = 'woocommerce_page_wcbom-manufacturing';
+	/**
+	 * The hook suffix WordPress assigns this submenu, captured from
+	 * add_submenu_page()'s return value rather than hand-computed: its
+	 * prefix is derived from sanitize_title() of the *parent's menu
+	 * title* (via a WP core global keyed by parent slug), not the
+	 * parent's slug itself — WooCommerce's own menu title happens to
+	 * sanitize to match its slug ("WooCommerce" → "woocommerce"), masking
+	 * this until a custom-titled parent menu (ours) exposes it.
+	 *
+	 * @var string|false|null
+	 */
+	private $hook_suffix;
 
 	/**
 	 * Hooks the admin menu and enqueue callbacks.
@@ -28,11 +39,11 @@ final class ManufacturePage {
 	}
 
 	/**
-	 * Adds the page under the WooCommerce admin menu.
+	 * Adds the page under the plugin's own top-level menu.
 	 */
 	public function add_menu_page(): void {
-		add_submenu_page(
-			'woocommerce',
+		$this->hook_suffix = add_submenu_page(
+			PluginMenu::SLUG,
 			__( 'Manufacturing', 'wcbom' ),
 			__( 'Manufacturing', 'wcbom' ),
 			'manage_woocommerce',
@@ -54,7 +65,7 @@ final class ManufacturePage {
 	 * @param string $hook Current admin page hook suffix.
 	 */
 	public function enqueue( string $hook ): void {
-		if ( self::HOOK_SUFFIX !== $hook ) {
+		if ( $this->hook_suffix !== $hook ) {
 			return;
 		}
 
