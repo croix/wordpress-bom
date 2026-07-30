@@ -13,6 +13,7 @@ use WC_Order;
 use WC_Order_Item_Product;
 use WCBOM\Bom\BomRepository;
 use WCBOM\Bom\ConditionMatcher;
+use WCBOM\Bom\ProductMode;
 use WCBOM\Stock\InsufficientStockException;
 use WCBOM\Stock\Ledger;
 use WCBOM\Stock\StockService;
@@ -71,7 +72,7 @@ final class OrderSync {
 			}
 
 			$product = $item->get_product();
-			if ( ! $product || 'made_to_order' !== $this->resolve_mode( $product->get_id() ) ) {
+			if ( ! $product || ProductMode::MADE_TO_ORDER !== ProductMode::resolve( $product->get_id() ) ) {
 				continue;
 			}
 
@@ -239,26 +240,6 @@ final class OrderSync {
 			'item_qty'   => (int) ( $decoded['item_qty'] ?? 0 ),
 			'components' => $components,
 		);
-	}
-
-	/**
-	 * The product's effective stock mode — a variation falls back to its
-	 * parent's mode when it has none of its own.
-	 *
-	 * @param int $product_id Product or variation ID.
-	 */
-	private function resolve_mode( int $product_id ): string {
-		$mode = (string) get_post_meta( $product_id, '_wcbom_mode', true );
-		if ( '' !== $mode ) {
-			return $mode;
-		}
-
-		$parent_id = (int) wp_get_post_parent_id( $product_id );
-		if ( $parent_id > 0 ) {
-			$mode = (string) get_post_meta( $parent_id, '_wcbom_mode', true );
-		}
-
-		return '' !== $mode ? $mode : 'standard';
 	}
 
 	/**

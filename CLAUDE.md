@@ -88,8 +88,8 @@ docker compose exec -T cli wp wcbom seed --path=/var/www/html
 - [x] Phase 0: wp-env setup, plugin scaffold, tables, fixture seeder — **done and verified 2026-07-29, see Progress Log**
 - [x] Phase 1: ledger + StockService + BOM editor — **done and verified 2026-07-29, see Progress Log**
 - [x] Phase 2: order consumption/restoration — **done and verified 2026-07-30, see Progress Log**
-- [ ] Phase 3: phantom (buildable) stock
-- [ ] Phase 3.5: inventory management screen (receive / count / adjust) — added 2026-07-30, spec in BUILD_PLAN §5.7
+- [x] Phase 3: phantom (buildable) stock — **done and verified 2026-07-30, see Progress Log**
+- [ ] Phase 3.5: inventory management screen (receive / count / adjust) — spec in BUILD_PLAN §5.7
 - [ ] Phase 4: manufacture orders (build/reverse)
 - [ ] Phase 5: reports, import/export, REST, CLI
 - [ ] Phase 6: hardening, tests, release prep
@@ -101,6 +101,28 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Phase 3 complete: phantom (buildable) stock, verified end-to-end
+
+**What was built:**
+- `Bom\ProductMode` — extracted the "resolve `_wcbom_mode`, falling back to the parent's" logic that Phase 2's `OrderSync` had as a private method into a shared static helper, since Phase 3's storefront filters need the identical fallback rule. `OrderSync` now delegates to it too — one source of truth, not two copies that could drift.
+- `Bom\ConditionMatcher` refactored: the condition-matching switch moved into a private `resolve_lines()`, with `resolve()` (order item, unchanged behavior) and a new `resolve_for_selection(Bom, array $attributes)` for add-to-cart time, before an order item exists.
+- `Bom\BomRepository` gained `used_in($component_id)` (reverse view: which active-BOM products reference a component) and `products_with_always_line($component_id)` (the reverse index phantom-stock invalidation needs — deliberately restricted to `always`-condition lines only, matching what actually feeds the cached headline number).
+- **`Stock\PhantomStock`** — `get_buildable_qty()`: `min(floor(component_stock ÷ qty))` over a BOM's `always` lines only, per BUILD_PLAN §5.3 (conditional lines are validated separately, at add-to-cart). Cached via a WP transient with **no TTL** — invalidated explicitly, never time-based, so the shop grid never recomputes this per page load. Three invalidation triggers, not one — see the bug below for why the third exists.
+- **`Stock\StorefrontStock`** — makes a made-to-order product's displayed stock *be* the buildable number: filters `woocommerce_product[_variation]_get_manage_stock/get_stock_quantity/get_stock_status` and `woocommerce_product_is_in_stock` (registered for both plain products and variations — WooCommerce fires distinctly-named filters for each). Plus `woocommerce_add_to_cart_validation`: checks only the *attribute-conditional* lines for the selected variation (always-lines are already covered by the headline number) and blocks with a clear notice naming the short component.
+- New hooks added as the invalidation seam: `StockService` fires `wcbom_stock_adjusted($product_id, $new_stock, $reason)` once per product after a committed transaction; `BomRepository::save()` fires `wcbom_bom_saved($product_id)`.
+- Component reverse view ("Used in: ...") added to `ProductBomMetabox`'s panel when editing a product flagged as a component — plain PHP, no React needed.
+
+**Real bug found by testing, not by reasoning about the code:** the first verification pass restocked a component directly via `$product->set_stock_quantity()->save()` (i.e., exactly what a merchant does on the normal WooCommerce Inventory tab) and the made-to-order product's displayed stock **stayed stale** — still showing the old, lower number. Root cause: `PhantomStock`'s invalidation only listened for `wcbom_stock_adjusted`, which **only `StockService` fires**. Any stock edit outside our own code — a manual admin edit, an import, a third-party plugin — never touched the cache. This isn't a corner case; a merchant manually adjusting a component's stock on its own edit screen is probably the *single most common* stock-editing action there is. **Fixed** by adding a second, independent invalidation trigger: WooCommerce's own `woocommerce_product_object_updated_props` action (fired whenever `WC_Product::save()` persists changed props, from *any* code path that goes through the standard WC_Product API), checking whether `stock_quantity` is among the changed props. Re-verified after the fix: restocking directly via `WC_Product` now correctly invalidates and recomputes. Firing both hooks for our own `StockService`-driven changes is harmless (invalidating an already-invalidated cache is a no-op) — this is intentional defense in depth, not redundancy to clean up later.
+
+**Verified end-to-end against the pinned stable stack**, via a throwaway `wp eval-file` script (deleted after; PHPCS/PHPStan clean throughout) — **the exact three-part demo scenario from BUILD_PLAN's Phase 3 entry, all passing**:
+1. Set blanks to 3 → product shows `stock_quantity=3`, `stock_status=instock`, `is_in_stock()=true`, `managing_stock()=true` (so WooCommerce's templates display a number instead of treating it as unmanaged).
+2. Bought 3 (a real order, full consumption path) → blanks correctly hit 0 → product's displayed stock updates to 0, `stock_status=outofstock`, `is_in_stock()=false` — all without touching product #21 directly; purely a side effect of its BOM's bottleneck component running out.
+3. Set Upgraded Metal Straw to 0 stock → the headline buildable number was **correctly unaffected** (Metal Straw is attribute-conditional, not an always-line) — but `woocommerce_add_to_cart_validation` **blocked only the Upgraded variation** ("only 0 available") while the Standard variation of the same product remained purchasable. Exactly the "only that option blocked" requirement.
+4. A follow-up cache-invalidation sanity check (change blanks again with no BOM edit) confirmed the number updates correctly — this is what caught the bug above.
+`wp-content/debug.log` stayed empty through all of it.
+
+**Next step: Phase 3.5** — the Inventory management screen spec'd earlier today (BUILD_PLAN §5.7): receive/count/adjust, all via `StockService`. Its "what did this unlock" buildable-count hint can now use `PhantomStock::get_buildable_qty()` directly. Then Phase 4 (manufacture orders).
 
 ### 2026-07-30 — Scope addition: Inventory management screen (Phase 3.5); ledger reason column widened
 

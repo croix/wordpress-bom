@@ -138,6 +138,15 @@ final class BomRepository {
 			throw $e;
 		}
 
+		/**
+		 * Fires after a new BOM version is committed. Stock\PhantomStock
+		 * hooks this to invalidate the product's buildable-qty cache — the
+		 * recipe itself just changed, not just component stock.
+		 *
+		 * @param int $product_id The product/variation whose BOM was saved.
+		 */
+		do_action( 'wcbom_bom_saved', $product_id );
+
 		return new Bom( $bom_id, $product_id, $version, true, $created_at, $user_id, $bom_items );
 	}
 
@@ -162,6 +171,68 @@ final class BomRepository {
 		);
 
 		return ( (int) $count ) > 0;
+	}
+
+	/**
+	 * Products whose currently-active BOM references this component —
+	 * the "used in N products" reverse view on a component's edit screen.
+	 *
+	 * @param int $component_id Product/variation ID to look up.
+	 * @return array<int,array{product_id:int,name:string}>
+	 */
+	public function used_in( int $component_id ): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- built via $wpdb->prepare().
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT DISTINCT b.product_id, p.post_title
+				 FROM {$wpdb->prefix}wcbom_bom_items bi
+				 INNER JOIN {$wpdb->prefix}wcbom_boms b ON b.bom_id = bi.bom_id
+				 INNER JOIN {$wpdb->posts} p ON p.ID = b.product_id
+				 WHERE bi.component_id = %d AND b.is_active = 1
+				 ORDER BY p.post_title ASC",
+				$component_id
+			),
+			ARRAY_A
+		);
+
+		return array_map(
+			static fn( array $row ): array => array(
+				'product_id' => (int) $row['product_id'],
+				'name'       => (string) $row['post_title'],
+			),
+			$rows
+		);
+	}
+
+	/**
+	 * Products whose currently-active BOM consumes this component via an
+	 * unconditional ("always") line — the set whose cached buildable
+	 * quantity depends on this component's stock. Deliberately excludes
+	 * attribute/addon-conditional lines: those only gate a specific
+	 * variation at add-to-cart time (Stock\StorefrontStock) and never
+	 * factor into the cached headline number (BUILD_PLAN.md §5.3).
+	 *
+	 * @param int $component_id Product/variation ID to look up.
+	 * @return array<int,int> Product IDs.
+	 */
+	public function products_with_always_line( int $component_id ): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- built via $wpdb->prepare().
+		$ids = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT DISTINCT b.product_id
+				 FROM {$wpdb->prefix}wcbom_bom_items bi
+				 INNER JOIN {$wpdb->prefix}wcbom_boms b ON b.bom_id = bi.bom_id
+				 WHERE bi.component_id = %d AND bi.condition_type = %s AND b.is_active = 1",
+				$component_id,
+				BomItem::CONDITION_ALWAYS
+			)
+		);
+
+		return array_map( 'intval', $ids );
 	}
 
 	/**

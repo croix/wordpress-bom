@@ -1,6 +1,6 @@
 <?php
 /**
- * Resolves which BOM lines apply to a specific order item.
+ * Resolves which BOM lines apply to a specific order item or cart selection.
  *
  * @package WCBOM
  */
@@ -14,23 +14,24 @@ use WC_Order_Item_Product;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Filters a BOM's lines down to the ones a given order item actually
- * consumes: "always" lines pass unconditionally; "attribute" lines match
- * the item's variation attributes; "addon" lines match values supplied by
- * integrations via the wcbom_order_item_addon_values filter.
+ * Filters a BOM's lines down to the ones that actually apply: "always"
+ * lines pass unconditionally; "attribute" lines match a taxonomy => term
+ * map; "addon" lines match a sanitized field-key => value map. Two entry
+ * points share the same matching logic: resolve() for an already-placed
+ * order item (Orders\OrderSync), and resolve_for_selection() for a
+ * variation the customer is about to add to cart (Stock\StorefrontStock) —
+ * the latter has no order item yet, so it takes attributes directly.
  */
 final class ConditionMatcher {
 
 	/**
-	 * The BOM lines applicable to this order item.
+	 * The BOM lines an order item actually consumes.
 	 *
 	 * @param Bom                   $bom  The (already resolved) BOM to filter.
 	 * @param WC_Order_Item_Product $item The order line item being consumed.
 	 * @return array<int,BomItem>
 	 */
 	public function resolve( Bom $bom, WC_Order_Item_Product $item ): array {
-		$attributes = $this->item_attributes( $item );
-
 		/**
 		 * Add-on/option values chosen for this order item, as a
 		 * sanitized key => value map. Integrations (e.g. ThemeHigh EPO)
@@ -42,6 +43,34 @@ final class ConditionMatcher {
 		 */
 		$addons = apply_filters( 'wcbom_order_item_addon_values', array(), $item );
 
+		return $this->resolve_lines( $bom, $this->item_attributes( $item ), $addons );
+	}
+
+	/**
+	 * The BOM lines that would apply to a given variation attribute
+	 * selection — used at add-to-cart time, before an order item exists.
+	 * Only attribute-conditional lines are meaningfully checkable here;
+	 * addon-conditional lines are validated once the order is placed
+	 * (add-to-cart-time addon data isn't yet standardized across
+	 * integrations — see BUILD_PLAN.md §12 risk 6).
+	 *
+	 * @param Bom                  $bom        The (already resolved) BOM to filter.
+	 * @param array<string,string> $attributes Taxonomy => term slug/name.
+	 * @return array<int,BomItem>
+	 */
+	public function resolve_for_selection( Bom $bom, array $attributes ): array {
+		return $this->resolve_lines( $bom, $attributes, array() );
+	}
+
+	/**
+	 * The shared condition-matching switch both entry points use.
+	 *
+	 * @param Bom                  $bom        The BOM to filter.
+	 * @param array<string,string> $attributes Taxonomy => term slug/name.
+	 * @param array<string,string> $addons     Sanitized field key => value.
+	 * @return array<int,BomItem>
+	 */
+	private function resolve_lines( Bom $bom, array $attributes, array $addons ): array {
 		return array_values(
 			array_filter(
 				$bom->items,

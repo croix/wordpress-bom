@@ -18,7 +18,9 @@ use WCBOM\Orders\OrderSync;
 use WCBOM\Orders\RefundHandler;
 use WCBOM\Rest\Api;
 use WCBOM\Stock\Ledger;
+use WCBOM\Stock\PhantomStock;
 use WCBOM\Stock\StockService;
+use WCBOM\Stock\StorefrontStock;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -57,14 +59,18 @@ final class Plugin {
 	 * is confirmed active.
 	 */
 	public function init(): void {
-		$boms  = new BomRepository();
-		$stock = new StockService( new Ledger() );
+		$boms    = new BomRepository();
+		$stock   = new StockService( new Ledger() );
+		$matcher = new ConditionMatcher();
+		$phantom = new PhantomStock( $boms );
 
-		( new ProductBomMetabox() )->register();
+		( new ProductBomMetabox( $boms ) )->register();
 		( new DeletionGuard( $boms ) )->register();
-		( new OrderSync( $stock, $boms, new ConditionMatcher() ) )->register();
+		( new OrderSync( $stock, $boms, $matcher ) )->register();
 		( new RefundHandler( $stock ) )->register();
 		( new ThemeHighEpo() )->register();
+		$phantom->register();
+		( new StorefrontStock( $phantom, $boms, $matcher ) )->register();
 
 		add_action(
 			'rest_api_init',

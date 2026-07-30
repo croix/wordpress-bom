@@ -137,6 +137,20 @@ final class StockService {
 			throw $e;
 		}
 
+		foreach ( $results as $product_id => $new_stock ) {
+			/**
+			 * Fires once per product after its stock is committed.
+			 * Stock\PhantomStock hooks this to invalidate the buildable-qty
+			 * cache of any made-to-order product whose BOM uses $product_id
+			 * as an always-consumed component.
+			 *
+			 * @param int    $product_id The product/variation just adjusted.
+			 * @param int    $new_stock  Its resulting stock quantity.
+			 * @param string $reason     One of Ledger::REASON_*.
+			 */
+			do_action( 'wcbom_stock_adjusted', $product_id, $new_stock, $reason );
+		}
+
 		return $results;
 	}
 }

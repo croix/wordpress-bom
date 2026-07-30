@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace WCBOM\Admin;
 
 use WC_Product;
+use WCBOM\Bom\BomRepository;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -19,6 +20,13 @@ defined( 'ABSPATH' ) || exit;
  * mount point and script enqueue for the React line editor.
  */
 final class ProductBomMetabox {
+
+	/**
+	 * Constructs the metabox.
+	 *
+	 * @param BomRepository $boms Used for the "used in N products" reverse view.
+	 */
+	public function __construct( private readonly BomRepository $boms ) {}
 
 	/**
 	 * Hooks all product-data-panel and enqueue callbacks.
@@ -102,9 +110,46 @@ final class ProductBomMetabox {
 		);
 
 		echo '</div>';
+
+		if ( $is_component ) {
+			$this->render_used_in( $product_id );
+		}
+
 		echo '<div class="options_group" id="wcbom-bom-editor-root" data-product-id="' . esc_attr( (string) $product_id ) . '">';
 		echo '<p class="description">' . esc_html__( 'Loading BOM editor…', 'wcbom' ) . '</p>';
 		echo '</div>';
+		echo '</div>';
+	}
+
+	/**
+	 * Renders the "used in N products" reverse view for a component: which
+	 * currently-active BOMs consume it, so a merchant can see the blast
+	 * radius of adjusting or discontinuing this product.
+	 *
+	 * @param int $component_id The component being edited.
+	 */
+	private function render_used_in( int $component_id ): void {
+		$used_in = $this->boms->used_in( $component_id );
+
+		echo '<div class="options_group">';
+		echo '<p><strong>' . esc_html__( 'Used in', 'wcbom' ) . ':</strong> ';
+
+		if ( array() === $used_in ) {
+			echo esc_html__( 'Not used in any active BOM.', 'wcbom' );
+		} else {
+			$links = array_map(
+				static fn( array $row ): string => sprintf(
+					'<a href="%s">%s</a>',
+					esc_url( (string) get_edit_post_link( $row['product_id'] ) ),
+					esc_html( $row['name'] )
+				),
+				$used_in
+			);
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- each $links entry is already escaped above.
+			echo implode( ', ', $links );
+		}
+
+		echo '</p>';
 		echo '</div>';
 	}
 

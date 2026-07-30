@@ -1,0 +1,143 @@
+<?php
+/**
+ * Buildable-quantity computation and caching for made-to-order products.
+ *
+ * @package WCBOM
+ */
+
+declare(strict_types=1);
+
+namespace WCBOM\Stock;
+
+use WC_Product;
+use WCBOM\Bom\BomRepository;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Computes "how many can I sell right now" for a made-to-order product:
+ * min(floor(component_stock ÷ qty)) across its BOM's unconditional
+ * ("always") lines only — attribute/addon-conditional components gate a
+ * specific variation instead (Stock\StorefrontStock::validate_add_to_cart()),
+ * per BUILD_PLAN.md §5.3. Cached indefinitely per product (no TTL) and
+ * invalidated via two triggers: our own wcbom_stock_adjusted/wcbom_bom_saved
+ * hooks (StockService/BomRepository), and WooCommerce's own
+ * woocommerce_product_object_updated_props — the latter catches stock
+ * edits that don't go through StockService at all, like a merchant
+ * manually editing a component's stock on its own Inventory tab. Without
+ * it the cache would only ever reflect ledgered changes, silently going
+ * stale on the single most common real-world stock edit.
+ */
+final class PhantomStock {
+
+	private const CACHE_KEY_PREFIX = 'wcbom_buildable_';
+
+	/**
+	 * Constructs the computation.
+	 *
+	 * @param BomRepository $boms BOM lookup used to compute buildable qty.
+	 */
+	public function __construct( private readonly BomRepository $boms ) {}
+
+	/**
+	 * Hooks the invalidation triggers.
+	 */
+	public function register(): void {
+		add_action( 'wcbom_stock_adjusted', array( $this, 'handle_stock_adjusted' ) );
+		add_action( 'wcbom_bom_saved', array( $this, 'invalidate' ) );
+		add_action( 'woocommerce_product_object_updated_props', array( $this, 'handle_product_updated' ), 10, 2 );
+	}
+
+	/**
+	 * A component's stock just changed — invalidate every made-to-order
+	 * product whose active BOM depends on it via an always-line.
+	 *
+	 * @param int $product_id The product/variation that was adjusted.
+	 */
+	public function handle_stock_adjusted( int $product_id ): void {
+		foreach ( $this->boms->products_with_always_line( $product_id ) as $affected_id ) {
+			$this->invalidate( $affected_id );
+		}
+	}
+
+	/**
+	 * Catches any stock edit that goes through the standard WC_Product API
+	 * without passing through StockService — chiefly a merchant manually
+	 * editing a component's stock on its own product edit screen.
+	 *
+	 * @param WC_Product        $product       The product WooCommerce just saved.
+	 * @param array<int,string> $updated_props Names of the props that changed.
+	 */
+	public function handle_product_updated( WC_Product $product, array $updated_props ): void {
+		if ( in_array( 'stock_quantity', $updated_props, true ) ) {
+			$this->handle_stock_adjusted( $product->get_id() );
+		}
+	}
+
+	/**
+	 * Clears one product's cached buildable quantity.
+	 *
+	 * @param int $product_id Product/variation ID.
+	 */
+	public function invalidate( int $product_id ): void {
+		delete_transient( self::CACHE_KEY_PREFIX . $product_id );
+	}
+
+	/**
+	 * The cached (or freshly computed) buildable quantity for a product.
+	 *
+	 * @param int $product_id Product or variation ID.
+	 */
+	public function get_buildable_qty( int $product_id ): int {
+		$cached = get_transient( self::CACHE_KEY_PREFIX . $product_id );
+		if ( false !== $cached ) {
+			return (int) $cached;
+		}
+
+		$qty = $this->compute( $product_id );
+		set_transient( self::CACHE_KEY_PREFIX . $product_id, $qty, 0 );
+
+		return $qty;
+	}
+
+	/**
+	 * The actual computation: min(floor(stock ÷ qty)) over always-lines.
+	 * A variation without its own BOM falls back to its parent's.
+	 *
+	 * @param int $product_id Product or variation ID.
+	 */
+	private function compute( int $product_id ): int {
+		$bom = $this->boms->get_active_for_product( $product_id );
+
+		if ( null === $bom ) {
+			$parent_id = (int) wp_get_post_parent_id( $product_id );
+			if ( $parent_id > 0 ) {
+				$bom = $this->boms->get_active_for_product( $parent_id );
+			}
+		}
+
+		if ( null === $bom ) {
+			return 0;
+		}
+
+		$buildable = null;
+
+		foreach ( $bom->always_items() as $line ) {
+			if ( $line->qty <= 0 ) {
+				continue;
+			}
+
+			$component = wc_get_product( $line->component_id );
+			if ( ! $component ) {
+				continue;
+			}
+
+			$possible = (int) floor( (float) $component->get_stock_quantity() / $line->qty );
+			if ( null === $buildable || $possible < $buildable ) {
+				$buildable = $possible;
+			}
+		}
+
+		return max( 0, $buildable ?? 0 );
+	}
+}
