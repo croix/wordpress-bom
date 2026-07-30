@@ -10,3 +10,4 @@ vendor/
 /build/
 /languages/*.pot
 /dist/
+.phpunit.result.cache

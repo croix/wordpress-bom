@@ -89,7 +89,18 @@ final class BomRepository {
 	public function save( int $product_id, array $items, int $user_id ): Bom {
 		global $wpdb;
 
-		$wpdb->query( 'START TRANSACTION' );
+		// See Stock\StockService::adjust_many() for why this can't be a bare
+		// START TRANSACTION: MySQL implicitly commits any already-open
+		// transaction (WP_UnitTestCase's test-isolation transaction, or a
+		// caller's own) the moment a new one starts. Use a SAVEPOINT instead
+		// whenever one is already open.
+		$nested = (bool) $wpdb->get_var( 'SELECT @@in_transaction' );
+
+		if ( $nested ) {
+			$wpdb->query( 'SAVEPOINT wcbom_bom_save' );
+		} else {
+			$wpdb->query( 'START TRANSACTION' );
+		}
 
 		try {
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- built via $wpdb->prepare().
@@ -154,9 +165,17 @@ final class BomRepository {
 				);
 			}
 
-			$wpdb->query( 'COMMIT' );
+			if ( $nested ) {
+				$wpdb->query( 'RELEASE SAVEPOINT wcbom_bom_save' );
+			} else {
+				$wpdb->query( 'COMMIT' );
+			}
 		} catch ( \Throwable $e ) {
-			$wpdb->query( 'ROLLBACK' );
+			if ( $nested ) {
+				$wpdb->query( 'ROLLBACK TO SAVEPOINT wcbom_bom_save' );
+			} else {
+				$wpdb->query( 'ROLLBACK' );
+			}
 			throw $e;
 		}
 

@@ -91,7 +91,18 @@ final class StockService {
 		// caller so concurrent multi-product transactions can't deadlock.
 		ksort( $deltas );
 
-		$wpdb->query( 'START TRANSACTION' );
+		// If we're already inside a transaction (e.g. WP_UnitTestCase's own
+		// test-isolation transaction, or some other plugin's hook), issuing
+		// a bare START TRANSACTION would implicitly COMMIT it — MySQL has no
+		// true nested transactions. Use a SAVEPOINT instead whenever one is
+		// already open, so this never disturbs a caller's own transaction.
+		$nested = (bool) $wpdb->get_var( 'SELECT @@in_transaction' );
+
+		if ( $nested ) {
+			$wpdb->query( 'SAVEPOINT wcbom_stock' );
+		} else {
+			$wpdb->query( 'START TRANSACTION' );
+		}
 
 		try {
 			$results = array();
@@ -131,9 +142,17 @@ final class StockService {
 				$results[ $product_id ] = $new_stock;
 			}
 
-			$wpdb->query( 'COMMIT' );
+			if ( $nested ) {
+				$wpdb->query( 'RELEASE SAVEPOINT wcbom_stock' );
+			} else {
+				$wpdb->query( 'COMMIT' );
+			}
 		} catch ( \Throwable $e ) {
-			$wpdb->query( 'ROLLBACK' );
+			if ( $nested ) {
+				$wpdb->query( 'ROLLBACK TO SAVEPOINT wcbom_stock' );
+			} else {
+				$wpdb->query( 'ROLLBACK' );
+			}
 
 			// wc_update_product_stock() updated object caches *before* our
 			// COMMIT — on rollback a persistent object cache (Redis etc.)

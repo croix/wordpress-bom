@@ -76,6 +76,37 @@ docker compose exec -T cli wp wcbom seed --path=/var/www/html
 - Plugins screen: WooCommerce, ThemeHigh EPO, variation-swatches-woo, and wc-bom-stock all active, no error banners.
 - `docker compose exec -T wordpress cat /var/www/html/wp-content/debug.log` should be empty/missing (no PHP notices).
 
+## Running the PHPUnit integration test suite
+
+Phase 6 added a real integration test suite (`tests/`, `phpunit.xml.dist`) that boots WordPress + WooCommerce for real inside the `tests-cli`/`tests-wordpress`/`tests-mysql` containers wp-env already creates alongside the dev ones — nothing new to install beyond what `wp-env` already brought up.
+
+**One-time per machine: get the WP core PHPUnit test-suite files onto the host.** wp-env's `tests-cli` container doesn't include `svn` (the standard installer script needs it), so fetch the `tests/phpunit` subtree straight from `wordpress-develop` instead — pick the branch matching the tests-wordpress container's actual WP core version (check via `docker compose exec -T tests-cli wp core version --path=/var/www/html`):
+```
+cd /tmp
+git clone --depth 1 --filter=blob:none --sparse --branch 6.9 https://github.com/WordPress/wordpress-develop.git
+cd wordpress-develop
+git sparse-checkout set tests/phpunit
+```
+Then copy `tests/phpunit` into the host-side wp-env directory that's already bind-mounted as `/wordpress-phpunit` inside the containers (find the path via `ls ~/.wp-env/` for the hash, then `~/.wp-env/<hash>/tests-WordPress-PHPUnit/tests/phpunit/`).
+
+**Every run:**
+```
+cd ~/.wp-env/<hash>
+docker compose up -d tests-mysql tests-wordpress tests-cli
+docker compose exec -T tests-cli bash -c "cd /var/www/html/wp-content/plugins/wordpress-bom && php vendor/bin/phpunit"
+```
+(`composer install` must have been run on the host first — `vendor/` is bind-mounted into `tests-cli` at the same path as the main `cli` container, per the Multi-machine note above.)
+
+**If the test DB ever gets stuck in a bad state** (e.g. mid-debugging with an interrupted process, or historically — see 2026-07-30 Progress Log entry below — after fixing the transaction-nesting bug that had been silently committing test data run after run), wipe it clean with a throwaway PHP script rather than hunting for a `mysql` client binary (there isn't one in `tests-mysql`):
+```
+docker compose exec -T tests-cli php -r '
+$m = new mysqli("tests-mysql", "root", "password");
+$m->query("DROP DATABASE IF EXISTS `tests-wordpress`");
+$m->query("CREATE DATABASE `tests-wordpress`");
+'
+```
+The next `phpunit` run recreates all tables (`WC_Install::install()` + `Schema::install()` in `tests/bootstrap.php`) from scratch.
+
 ## Conventions
 
 - PHP 8.1+, PSR-4 (`WCBOM\` → `src/`), WPCS-Extra + PHPStan level 6.
@@ -93,7 +124,7 @@ docker compose exec -T cli wp wcbom seed --path=/var/www/html
 - [x] Phase 4: manufacture orders (build/reverse) — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 4.5: BOM-derived shipping weight & add-on surcharges — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 5: reports, import/export, REST, CLI — **done and verified 2026-07-30, see Progress Log**
-- [ ] Phase 6: hardening, tests, release prep
+- [ ] Phase 6: hardening, tests, release prep — **in progress**: UI/cosmetic pass done, PHPUnit suite covering full §9 checklist done (see Progress Log); remaining: HPOS on/off + blocks vs. shortcode checkout matrix, uninstall data-policy re-verify, readme.txt + i18n/POT, §12 dependency version check-in
 
 Update this checklist as phases complete. Remaining open decisions are in BUILD_PLAN.md §11.
 
@@ -102,6 +133,31 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Manufacture modal spacing fix; Inventory page retitled "Component Inventory"
+
+Two small developer-reported/requested fixes landed just before Phase 6 started:
+
+- **Manufacture modal field-label spacing bug (reported):** on the New/Complete/Reverse manufacture-order modals, field labels visually aligned with the field *above* them instead of their own field, reading as confusing/broken. Root cause: every field had `__nextHasNoMarginBottom` with nothing replacing the margin it removes — but on this project's installed WP version, `BaseControl`'s margin-bottom is already `0px` regardless of that prop (confirmed via `getComputedStyle` — the flag is a no-op here), so removing the prop alone had zero visual effect. Also deliberately avoided `@wordpress/components`' `VStack`/`HStack` (confirmed still `__experimental`-only even on the actual installed WP core JS bundle) per this project's standing rule against experimental component APIs (BUILD_PLAN §12). Fixed with a plain `Field` wrapper `<div style={{marginBottom:'16px'}}>` around every stacked field in all three modals (`assets/src/manufacture/index.js`). Verified live across a full draft → complete → reverse cycle. Applied the same fix proactively to Inventory's Note field during the later UI sweep (same underlying bug, not separately reported).
+- **Inventory page retitled "Component Inventory"** (the developer's request) — page `page_title`/React `<h1>` changed; the menu label stays "Inventory" (the longer title wouldn't fit in the menu). Makes clear this is the BOM-component inventory, not WooCommerce's own product inventory.
+
+### 2026-07-30 — Phase 6: PHPUnit integration suite covers the full §9 checklist (all 13 scenarios), two real transaction bugs found and fixed
+
+the developer asked to start Phase 6 (hardening/tests/release prep) after the admin-menu reorg and a manufacture-modal spacing fix (both below). Built a real PHPUnit integration suite against the actual WP core test framework + WooCommerce (not mocks) — `composer.json` gained `phpunit/phpunit` + `yoast/phpunit-polyfills`; `phpunit.xml.dist`, `tests/bootstrap.php`, `tests/wp-tests-config.php`, `tests/WCBOM_UnitTestCase.php` (shared factories: components, made-to-order products, manufactured products, orders) set up the harness. See "Running the PHPUnit integration test suite" above for the reproducible setup (the WP-core test-suite files needed a `git clone --sparse` workaround since `tests-cli` has no `svn`).
+
+**Two real, general-purpose production bugs found by the suite, not by reasoning about the code:**
+1. **`StockService::adjust_many()` and `BomRepository::save()` both issued raw `START TRANSACTION`/`COMMIT`/`ROLLBACK`.** MySQL implicitly commits any already-open transaction the instant a new `START TRANSACTION` runs — so the *first* stock adjustment or BOM save in any test permanently committed WP's own per-test isolation transaction, and every test after that leaked real, never-rolled-back data into the next (manifesting as a "new" order already having 3 line items, stock deltas that didn't match quantities, and different wrong results on every re-run of the identical test). Fixed by detecting `SELECT @@in_transaction` and using a `SAVEPOINT`/`RELEASE SAVEPOINT`/`ROLLBACK TO SAVEPOINT` instead whenever already inside a transaction, in both files. This isn't test-only: it also protects production if any other plugin/hook ever wraps a call into this code in its own transaction. Verified by wiping the now-polluted `tests-wordpress` DB (`DROP DATABASE`/`CREATE DATABASE` via a one-off `mysqli` script — no `mysql` client binary exists in that container) and re-running the full suite 3× consecutively with identical, correct results each time.
+2. **Test-helper bug (not production):** `wc_create_refund()` reads `line_items[$id]['refund_total']` directly; a test that only supplied `qty` tripped an "undefined array key" warning inside WC core that aborted the refund. Real usage (the admin refund UI) always sends both keys — fixed the test payload, not the plugin.
+
+**All 13 §9 acceptance scenarios now have automated coverage** (18 tests total, `tests/OrderConsumptionTest.php`, `OrderConditionalConsumptionTest.php`, `ManufactureOrderTest.php`, `DeletionGuardTest.php`, `PhantomStockQueryTest.php`, `ConcurrencyTest.php`):
+- 1–5: order consumption/snapshot, cancel restore, partial-refund proportional restore, snapshot-not-current-BOM restoration.
+- 6: **concurrency** — no `pcntl` in the container, so this opens a second real `mysqli` connection and manually interleaves `SELECT ... FOR UPDATE` against it to prove MySQL's row lock genuinely blocks a second session, then confirms `StockService` sees the *committed* result rather than a stale read. Needed one extra trick: WP_UnitTestCase wraps every test in its own transaction (`START TRANSACTION` in `set_up()`, `ROLLBACK` in `tear_down()`), so a separate connection can't see this test's fixture at all unless deliberately committed via the framework's own public `self::commit_transaction()`/`$this->start_transaction()` — safe to do because each test gets a fresh transaction anyway, as long as the fixture is cleaned up manually afterward instead of relying on the (now-bypassed) automatic rollback.
+- 7–10: manufacture order complete (components down, finished stock up, snapshot + unit cost recorded), partial reverse + blocked over-reverse, reverse blocked when finished stock already sold below the requested qty, reversal reads the MOI snapshot not a since-edited BOM. **Bug caught writing these tests:** the first draft used `create_made_to_order()` for the *finished good* too, which sets `_wcbom_mode = made_to_order` — that silently routed its `get_stock_quantity()` through `StorefrontStock`'s phantom-stock filter (built for made-to-order products), so the assertions were reading the BOM-buildable number instead of the real physical count. Added a distinct `create_manufactured_product()` test factory (`_wcbom_mode = manufactured`, real `manage_stock`) — a manufactured/restockable finished good must never be made_to_order.
+- 11: trashing/deleting a component in an active BOM is blocked (`wp_die()` → `WPDieException` in the WP test framework); a component in no active BOM trashes normally.
+- 12: phantom stock's no-TTL transient cache adds **zero** DB queries across 25 products on a warm cache — the property that actually prevents an N+1 on the shop grid.
+- 13 (`wp wcbom audit` drift detection): **not** run through PHPUnit — `Cli\Commands` calls `WP_CLI::log()`/`error()` directly, and only `php-stubs/wp-cli-stubs` (empty-bodied stub classes for static analysis) is on the Composer autoload path in the test harness, not a real WP-CLI runtime. Verified live instead via the actual dev environment's `wp wcbom audit` (real activation, real `wp` binary) after manually editing a component's stock outside `StockService` — correctly reported as drift, report-only, no stock touched.
+
+Full suite (18 tests) passes reliably across repeated runs. PHPCS (50 files) and PHPStan level 6 (whole `src/`) both clean.
 
 ### 2026-07-30 — Own top-level "BOM & Stock" admin menu, moved off WooCommerce's menu (§14.8)
 
