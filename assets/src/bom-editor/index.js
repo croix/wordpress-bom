@@ -17,6 +17,10 @@ const CONDITION_ALWAYS = 'always';
 const CONDITION_ATTRIBUTE = 'attribute';
 const CONDITION_ADDON = 'addon';
 
+function fromServer( item ) {
+	return { key: `saved-${ item.item_id }`, ...item, surcharge: item.surcharge ?? '' };
+}
+
 function emptyLine() {
 	return {
 		key: `new-${ Math.random().toString( 36 ).slice( 2 ) }`,
@@ -27,10 +31,11 @@ function emptyLine() {
 		condition_type: CONDITION_ALWAYS,
 		condition_key: '',
 		condition_value: '',
+		surcharge: '',
 	};
 }
 
-function BomEditor( { productId, restNamespace, variationAttributes } ) {
+function BomEditor( { productId, restNamespace, variationAttributes, weightFromBom } ) {
 	const [ items, setItems ] = useState( [] );
 	const [ loading, setLoading ] = useState( true );
 	const [ saving, setSaving ] = useState( false );
@@ -47,11 +52,7 @@ function BomEditor( { productId, restNamespace, variationAttributes } ) {
 		apiFetch( { path: `/${ restNamespace }/boms/${ productId }` } )
 			.then( ( response ) => {
 				const bom = response.bom;
-				setItems(
-					bom
-						? bom.items.map( ( item ) => ( { key: `saved-${ item.item_id }`, ...item } ) )
-						: []
-				);
+				setItems( bom ? bom.items.map( fromServer ) : [] );
 			} )
 			.catch( ( err ) => setError( err.message || String( err ) ) )
 			.finally( () => setLoading( false ) );
@@ -86,13 +87,16 @@ function BomEditor( { productId, restNamespace, variationAttributes } ) {
 					condition_type: item.condition_type,
 					condition_key: item.condition_type === CONDITION_ALWAYS ? null : item.condition_key,
 					condition_value: item.condition_type === CONDITION_ALWAYS ? null : item.condition_value,
+					surcharge: item.surcharge !== '' && item.surcharge !== null && item.surcharge !== undefined
+						? parseFloat( item.surcharge )
+						: null,
 				} ) ),
 		};
 
 		apiFetch( { path: `/${ restNamespace }/boms/${ productId }`, method: 'POST', data: payload } )
 			.then( ( response ) => {
 				const bom = response.bom;
-				setItems( bom.items.map( ( item ) => ( { key: `saved-${ item.item_id }`, ...item } ) ) );
+				setItems( bom.items.map( fromServer ) );
 				loadBuildable();
 			} )
 			.catch( ( err ) => setError( err.message || String( err ) ) )
@@ -132,6 +136,7 @@ function BomEditor( { productId, restNamespace, variationAttributes } ) {
 							<th>{ __( 'Component', 'wcbom' ) }</th>
 							<th>{ __( 'Qty', 'wcbom' ) }</th>
 							<th>{ __( 'Consume when', 'wcbom' ) }</th>
+							<th>{ __( 'Surcharge', 'wcbom' ) }</th>
 							<th></th>
 						</tr>
 					</thead>
@@ -142,6 +147,7 @@ function BomEditor( { productId, restNamespace, variationAttributes } ) {
 								item={ item }
 								restNamespace={ restNamespace }
 								variationAttributes={ variationAttributes }
+								weightFromBom={ weightFromBom }
 								onChange={ ( patch ) => updateItem( item.key, patch ) }
 								onRemove={ () => removeItem( item.key ) }
 							/>
@@ -163,8 +169,10 @@ function BomEditor( { productId, restNamespace, variationAttributes } ) {
 	);
 }
 
-function BomLineRow( { item, restNamespace, variationAttributes, onChange, onRemove } ) {
+function BomLineRow( { item, restNamespace, variationAttributes, weightFromBom, onChange, onRemove } ) {
 	const attribute = variationAttributes.find( ( attr ) => attr.taxonomy === item.condition_key );
+	const missingWeight = weightFromBom && item.component && ! ( parseFloat( item.component.weight ) > 0 );
+	const surchargeOnAttribute = item.condition_type === CONDITION_ATTRIBUTE && parseFloat( item.surcharge ) > 0;
 
 	return (
 		<tr>
@@ -177,6 +185,11 @@ function BomLineRow( { item, restNamespace, variationAttributes, onChange, onRem
 					}
 					onClear={ () => onChange( { component_id: 0, component: null } ) }
 				/>
+				{ missingWeight && (
+					<p className="description wcbom-line-warning">
+						{ __( '⚠ This component has no weight set — it will contribute 0 to the BOM-derived shipping weight.', 'wcbom' ) }
+					</p>
+				) }
 			</td>
 			<td>
 				<TextControl
@@ -258,6 +271,23 @@ function BomLineRow( { item, restNamespace, variationAttributes, onChange, onRem
 				) }
 			</td>
 			<td>
+				<TextControl
+					type="number"
+					step="0.01"
+					min="0"
+					placeholder={ __( 'none', 'wcbom' ) }
+					value={ item.surcharge }
+					onChange={ ( surcharge ) => onChange( { surcharge } ) }
+					__next40pxDefaultSize
+					__nextHasNoMarginBottom
+				/>
+				{ surchargeOnAttribute && (
+					<p className="description wcbom-line-warning">
+						{ __( '⚠ Stacks additively with variation pricing — make sure this option doesn\'t already charge more through its own variation price.', 'wcbom' ) }
+					</p>
+				) }
+			</td>
+			<td>
 				<Button variant="tertiary" isDestructive onClick={ onRemove }>
 					{ __( 'Remove', 'wcbom' ) }
 				</Button>
@@ -268,8 +298,13 @@ function BomLineRow( { item, restNamespace, variationAttributes, onChange, onRem
 
 const root = document.getElementById( 'wcbom-bom-editor-root' );
 if ( root && window.wcbomBomEditor ) {
-	const { productId, restNamespace, variationAttributes } = window.wcbomBomEditor;
+	const { productId, restNamespace, variationAttributes, weightFromBom } = window.wcbomBomEditor;
 	createRoot( root ).render(
-		<BomEditor productId={ productId } restNamespace={ restNamespace } variationAttributes={ variationAttributes || [] } />
+		<BomEditor
+			productId={ productId }
+			restNamespace={ restNamespace }
+			variationAttributes={ variationAttributes || [] }
+			weightFromBom={ !! weightFromBom }
+		/>
 	);
 }

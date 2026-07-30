@@ -143,26 +143,30 @@ final class SampleData {
 
 	/**
 	 * Creates the component products (blank tumbler + raw materials).
+	 * Weights are in the store's configured weight unit (lbs in this
+	 * dev env) per unit of the component's own stock unit — e.g. Epoxy's
+	 * 0.0022 is "per ml" so a 5ml BOM line contributes 0.011 — so §5.10's
+	 * BOM-derived shipping weight demos correctly out of the box.
 	 *
 	 * @return array<string,int> Component name => product ID.
 	 */
 	private function create_components(): array {
 		$specs = array(
-			array( '24oz Blank Tumbler', 100, 'ea', true ),
-			array( 'Glitter - Pink', 500, 'g', false ),
-			array( 'Glitter - Blue', 500, 'g', false ),
-			array( 'Vinyl Sheet', 40, 'sheet', false ),
-			array( 'Epoxy', 200, 'ml', false ),
-			array( 'Standard Straw', 300, 'ea', false ),
-			array( 'Upgraded Metal Straw', 50, 'ea', false ),
-			array( 'Standard Cap', 300, 'ea', false ),
-			array( 'Upgraded Cap', 50, 'ea', false ),
-			array( 'Sticker Pack', 100, 'ea', false ),
+			array( '24oz Blank Tumbler', 100, 'ea', true, 0.5 ),
+			array( 'Glitter - Pink', 500, 'g', false, 0.0022 ),
+			array( 'Glitter - Blue', 500, 'g', false, 0.0022 ),
+			array( 'Vinyl Sheet', 40, 'sheet', false, 0.02 ),
+			array( 'Epoxy', 200, 'ml', false, 0.0022 ),
+			array( 'Standard Straw', 300, 'ea', false, 0.02 ),
+			array( 'Upgraded Metal Straw', 50, 'ea', false, 0.05 ),
+			array( 'Standard Cap', 300, 'ea', false, 0.04 ),
+			array( 'Upgraded Cap', 50, 'ea', false, 0.06 ),
+			array( 'Sticker Pack', 100, 'ea', false, 0.01 ),
 		);
 
 		$ids = array();
 
-		foreach ( $specs as list( $name, $stock, $unit, $sellable ) ) {
+		foreach ( $specs as list( $name, $stock, $unit, $sellable, $weight ) ) {
 			$product = new WC_Product_Simple();
 			$product->set_name( $name );
 			$product->set_regular_price( '0' );
@@ -170,6 +174,7 @@ final class SampleData {
 			$product->set_stock_quantity( $stock );
 			$product->set_stock_status( 'instock' );
 			$product->set_catalog_visibility( $sellable ? 'visible' : 'hidden' );
+			$product->set_weight( (string) $weight );
 			$product->set_status( 'publish' );
 			$product_id = $product->save();
 
@@ -197,6 +202,7 @@ final class SampleData {
 		$product->set_stock_quantity( $stock );
 		$product->set_stock_status( 'instock' );
 		$product->set_catalog_visibility( 'visible' );
+		$product->set_weight( '0.55' );
 		$product->set_status( 'publish' );
 		$product_id = $product->save();
 
@@ -244,6 +250,7 @@ final class SampleData {
 		$product_id = $product->save();
 
 		update_post_meta( $product_id, '_wcbom_mode', 'made_to_order' );
+		update_post_meta( $product_id, '_wcbom_weight_from_bom', 'yes' );
 		update_post_meta( $product_id, self::FIXTURE_META, '1' );
 
 		foreach ( $this->variation_combinations() as list( $glitter, $straw ) ) {
@@ -327,7 +334,11 @@ final class SampleData {
 	/**
 	 * Seeds the starter BOM directly into the plugin tables: always-consume
 	 * the blank tumbler/epoxy/cap, plus glitter/straw lines conditional on
-	 * the variation attributes registered above.
+	 * the variation attributes registered above. The Blue Glitter line
+	 * carries a $2 surcharge (§5.10) as a clean surcharge demo: unlike
+	 * straw, glitter color has no variation-level price difference of its
+	 * own, so this doesn't double-charge — blue costs $2 more purely via
+	 * the BOM line, not by adding a second Blue variation price tier.
 	 *
 	 * @param int               $product_id       The made-to-order product's ID.
 	 * @param array<string,int> $components       Component name => product ID.
@@ -351,16 +362,16 @@ final class SampleData {
 		$bom_id = (int) $wpdb->insert_id;
 
 		$lines = array(
-			array( $components['24oz Blank Tumbler'], 1, 'always', null, null ),
-			array( $components['Glitter - Pink'], 15, 'attribute', $glitter_taxonomy, 'pink' ),
-			array( $components['Glitter - Blue'], 15, 'attribute', $glitter_taxonomy, 'blue' ),
-			array( $components['Epoxy'], 5, 'always', null, null ),
-			array( $components['Standard Cap'], 1, 'always', null, null ),
-			array( $components['Standard Straw'], 1, 'attribute', $straw_taxonomy, 'standard' ),
-			array( $components['Upgraded Metal Straw'], 1, 'attribute', $straw_taxonomy, 'upgraded' ),
+			array( $components['24oz Blank Tumbler'], 1, 'always', null, null, null ),
+			array( $components['Glitter - Pink'], 15, 'attribute', $glitter_taxonomy, 'pink', null ),
+			array( $components['Glitter - Blue'], 15, 'attribute', $glitter_taxonomy, 'blue', 2.00 ),
+			array( $components['Epoxy'], 5, 'always', null, null, null ),
+			array( $components['Standard Cap'], 1, 'always', null, null, null ),
+			array( $components['Standard Straw'], 1, 'attribute', $straw_taxonomy, 'standard', null ),
+			array( $components['Upgraded Metal Straw'], 1, 'attribute', $straw_taxonomy, 'upgraded', null ),
 		);
 
-		foreach ( $lines as $i => list( $component_id, $qty, $condition_type, $condition_key, $condition_value ) ) {
+		foreach ( $lines as $i => list( $component_id, $qty, $condition_type, $condition_key, $condition_value, $surcharge ) ) {
 			$wpdb->insert(
 				$wpdb->prefix . 'wcbom_bom_items',
 				array(
@@ -371,10 +382,27 @@ final class SampleData {
 					'condition_key'   => $condition_key,
 					'condition_value' => $condition_value,
 					'sort_order'      => $i,
+					'surcharge'       => $surcharge,
 				),
-				array( '%d', '%d', '%f', '%s', '%s', '%s', '%d' )
+				array( '%d', '%d', '%f', '%s', '%s', '%s', '%d', '%f' )
 			);
 		}
+
+		/**
+		 * This BOM is written directly via $wpdb, not BomRepository::save(),
+		 * so it must fire the same action save() does. Without this,
+		 * Stock\PhantomStock never invalidates — and it matters here more
+		 * than it looks: _wcbom_mode is set on $product_id (made_to_order)
+		 * before this method runs but after the variations above are
+		 * created, so each variation->save() call above executes while
+		 * ProductMode::resolve() already falls back to a "made_to_order"
+		 * parent with no BOM yet — anything that reads a variation's stock
+		 * status during that window caches a permanent buildable-qty of 0
+		 * for it. Firing this now invalidates the product and (per
+		 * PhantomStock::invalidate()'s cascade) every variation child too,
+		 * clearing any such poisoning left over from that window.
+		 */
+		do_action( 'wcbom_bom_saved', $product_id );
 
 		return $bom_id;
 	}

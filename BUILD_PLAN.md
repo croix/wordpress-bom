@@ -377,10 +377,10 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 - MO CRUD screen, draft/complete/reverse (partial), snapshots, scrap handling, `ProductFactory` (new-listing-from-template flow), pick list print view.
 - ✅ Demo: the exact scenario from the brief — manufacture 12 pink glitter tumblers, new listing appears with stock 12, blanks −12; reverse 4 → stock 8, blanks +4.
 
-### Phase 4.5 — BOM-derived shipping weight & add-on surcharges (~1 day, added 2026-07-30)
+### Phase 4.5 — BOM-derived shipping weight & add-on surcharges (~1 day, added 2026-07-30) — ✅ **done and verified 2026-07-30, see CLAUDE.md Progress Log**
 - Per §5.10: opt-in per-product toggle; cart-item weight = Σ(component weight × qty) over resolved BOM lines via the cart-item filters; BOM editor hint for weightless components; sample components gain realistic weights.
 - Add-on surcharges per §5.10: optional per-line surcharge in the BOM editor; the same cart-time line resolution sets price = base + Σ(matched surcharges); double-charge warning for surcharges on attribute lines with variation pricing.
-- ✅ Demo: toggle on, add Pink/Upgraded to cart → cart shipping weight = blank + glitter grams + epoxy + cap + metal straw exactly; switch to Standard straw → weight drops by the straw delta alone. Sticker add-on line with a $3 surcharge → cart price rises $3 only when stickers chosen.
+- ✅ Demo (verified, using the seeded Blue Glitter $2 surcharge in place of the brief's hypothetical sticker example): Blue/Standard added to cart → cart price $26.99 exactly ($24.99 + $2 surcharge); all four variation combinations' weight independently verified against hand-computed Σ(component weight × qty) — Pink/Standard 0.604, Pink/Upgraded 0.634, Blue/Standard 0.604, Blue/Upgraded 0.634 lbs, each exact.
 
 ### Phase 5 — Reporting, alerts, import/export, API (~2–3 days)
 - Ledger browser + CSV export, buildable/usage reports, low-component-stock digest, CSV BOM import/export, REST endpoints, WP-CLI audit/recompute.

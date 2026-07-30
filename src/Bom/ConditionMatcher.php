@@ -48,18 +48,21 @@ final class ConditionMatcher {
 
 	/**
 	 * The BOM lines that would apply to a given variation attribute
-	 * selection — used at add-to-cart time, before an order item exists.
-	 * Only attribute-conditional lines are meaningfully checkable here;
-	 * addon-conditional lines are validated once the order is placed
-	 * (add-to-cart-time addon data isn't yet standardized across
-	 * integrations — see BUILD_PLAN.md §12 risk 6).
+	 * selection — used at add-to-cart time, before an order item exists,
+	 * and at cart-display time (Cart\CartPricing) for BOM-derived weight
+	 * and surcharge pricing. Addon-conditional lines only match here if
+	 * the caller can supply live addon values (Cart\CartPricing does, via
+	 * wcbom_cart_item_addon_values; Stock\StorefrontStock's add-to-cart
+	 * check does not — see BUILD_PLAN.md §12 risk 6 — so it omits $addons
+	 * and those lines simply don't match there).
 	 *
 	 * @param Bom                  $bom        The (already resolved) BOM to filter.
 	 * @param array<string,string> $attributes Taxonomy => term slug/name.
+	 * @param array<string,string> $addons     Sanitized field key => value, if available.
 	 * @return array<int,BomItem>
 	 */
-	public function resolve_for_selection( Bom $bom, array $attributes ): array {
-		return $this->resolve_lines( $bom, $attributes, array() );
+	public function resolve_for_selection( Bom $bom, array $attributes, array $addons = array() ): array {
+		return $this->resolve_lines( $bom, $attributes, $addons );
 	}
 
 	/**

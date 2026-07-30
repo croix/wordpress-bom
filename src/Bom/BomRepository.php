@@ -62,9 +62,9 @@ final class BomRepository {
 	 * Saves a new BOM version for a product: deactivates any existing
 	 * active version, inserts the new header + lines in one transaction.
 	 *
-	 * @param int                                                                                                              $product_id Product/variation this BOM applies to.
-	 * @param array<int,array{component_id:int,qty:float,condition_type:string,condition_key:?string,condition_value:?string}> $items Ordered lines to save.
-	 * @param int                                                                                                              $user_id User performing the save.
+	 * @param int                                                                                                                               $product_id Product/variation this BOM applies to.
+	 * @param array<int,array{component_id:int,qty:float,condition_type:string,condition_key:?string,condition_value:?string,surcharge:?float}> $items Ordered lines to save.
+	 * @param int                                                                                                                               $user_id User performing the save.
 	 *
 	 * @throws \Throwable Re-thrown after rolling back the transaction.
 	 */
@@ -107,6 +107,8 @@ final class BomRepository {
 
 			$bom_items = array();
 			foreach ( array_values( $items ) as $sort_order => $item ) {
+				$surcharge = isset( $item['surcharge'] ) ? (float) $item['surcharge'] : null;
+
 				$wpdb->insert(
 					$wpdb->prefix . 'wcbom_bom_items',
 					array(
@@ -117,8 +119,9 @@ final class BomRepository {
 						'condition_key'   => $item['condition_key'],
 						'condition_value' => $item['condition_value'],
 						'sort_order'      => $sort_order,
+						'surcharge'       => $surcharge,
 					),
-					array( '%d', '%d', '%f', '%s', '%s', '%s', '%d' )
+					array( '%d', '%d', '%f', '%s', '%s', '%s', '%d', '%f' )
 				);
 
 				$bom_items[] = new BomItem(
@@ -128,7 +131,8 @@ final class BomRepository {
 					(string) $item['condition_type'],
 					$item['condition_key'],
 					$item['condition_value'],
-					$sort_order
+					$sort_order,
+					$surcharge
 				);
 			}
 

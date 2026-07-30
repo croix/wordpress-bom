@@ -138,6 +138,14 @@ final class Api {
 				return new WP_Error( 'wcbom_invalid_condition', __( 'Invalid condition_type.', 'wcbom' ), array( 'status' => 400 ) );
 			}
 
+			$surcharge = null;
+			if ( isset( $item['surcharge'] ) && '' !== $item['surcharge'] ) {
+				if ( ! is_numeric( $item['surcharge'] ) || (float) $item['surcharge'] < 0 ) {
+					return new WP_Error( 'wcbom_invalid_surcharge', __( 'Surcharge must be a non-negative number.', 'wcbom' ), array( 'status' => 400 ) );
+				}
+				$surcharge = (float) $item['surcharge'];
+			}
+
 			$clean[] = array(
 				'component_id'    => $component_id,
 				'qty'             => isset( $item['qty'] ) ? (float) $item['qty'] : 0.0,
@@ -148,6 +156,7 @@ final class Api {
 				'condition_value' => BomItem::CONDITION_ALWAYS === $condition_type
 					? null
 					: sanitize_title( (string) ( $item['condition_value'] ?? '' ) ),
+				'surcharge'       => $surcharge,
 			);
 		}
 
@@ -308,6 +317,7 @@ final class Api {
 						'condition_key'   => $item->condition_key,
 						'condition_value' => $item->condition_value,
 						'sort_order'      => $item->sort_order,
+						'surcharge'       => $item->surcharge,
 					);
 				},
 				$bom->items
@@ -329,12 +339,13 @@ final class Api {
 		$unit = get_post_meta( $product->get_id(), '_wcbom_unit', true );
 
 		return array(
-			'id'    => $product->get_id(),
-			'name'  => $product->get_name(),
-			'sku'   => $product->get_sku(),
-			'unit'  => '' !== $unit ? $unit : 'ea',
-			'stock' => $product->get_stock_quantity(),
-			'price' => $product->get_regular_price(),
+			'id'     => $product->get_id(),
+			'name'   => $product->get_name(),
+			'sku'    => $product->get_sku(),
+			'unit'   => '' !== $unit ? $unit : 'ea',
+			'stock'  => $product->get_stock_quantity(),
+			'price'  => $product->get_regular_price(),
+			'weight' => $product->get_weight(),
 		);
 	}
 }

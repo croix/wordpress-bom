@@ -27,10 +27,11 @@ defined( 'ABSPATH' ) || exit;
 final class ThemeHighEpo {
 
 	/**
-	 * Hooks the addon-values filter.
+	 * Hooks the addon-values filters (order-item time and cart time).
 	 */
 	public function register(): void {
 		add_filter( 'wcbom_order_item_addon_values', array( $this, 'provide_values' ), 10, 2 );
+		add_filter( 'wcbom_cart_item_addon_values', array( $this, 'provide_cart_values' ), 10, 2 );
 	}
 
 	/**
@@ -56,6 +57,40 @@ final class ThemeHighEpo {
 			}
 
 			$sanitized_key = sanitize_key( $key );
+			if ( '' !== $sanitized_key && ! isset( $values[ $sanitized_key ] ) ) {
+				$values[ $sanitized_key ] = (string) $data['value'];
+			}
+		}
+
+		return $values;
+	}
+
+	/**
+	 * Exposes a cart item's EPO field selections as sanitized key => value
+	 * pairs, for BOM lines that need to gate/surcharge on an add-on choice
+	 * before an order exists (Cart\CartPricing's weight/surcharge display).
+	 * EPO free stores these under `$cart_item['thwepof_options']`, keyed by
+	 * the field's internal name — the same key it later writes as the
+	 * order item's meta key (`wc_add_order_item_meta( $item_id, $name,
+	 * $value )`), so `sanitize_key( $name )` here matches
+	 * `sanitize_key( $key )` in provide_values() above for the same field.
+	 *
+	 * @param array<string,string> $values    Values from earlier providers.
+	 * @param array<string,mixed>  $cart_item The cart item array.
+	 * @return array<string,string>
+	 */
+	public function provide_cart_values( array $values, array $cart_item ): array {
+		$options = $cart_item['thwepof_options'] ?? null;
+		if ( ! is_array( $options ) ) {
+			return $values;
+		}
+
+		foreach ( $options as $name => $data ) {
+			if ( ! is_array( $data ) || ! isset( $data['value'] ) || ! is_scalar( $data['value'] ) ) {
+				continue;
+			}
+
+			$sanitized_key = sanitize_key( (string) $name );
 			if ( '' !== $sanitized_key && ! isset( $values[ $sanitized_key ] ) ) {
 				$values[ $sanitized_key ] = (string) $data['value'];
 			}

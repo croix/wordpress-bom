@@ -17,6 +17,7 @@ use WCBOM\Admin\RecommendedPlugins;
 use WCBOM\Admin\Settings;
 use WCBOM\Bom\BomRepository;
 use WCBOM\Bom\ConditionMatcher;
+use WCBOM\Cart\CartPricing;
 use WCBOM\Install\SampleData;
 use WCBOM\Integrations\ThemeHighEpo;
 use WCBOM\Manufacture\ManufactureRepository;
@@ -88,6 +89,7 @@ final class Plugin {
 		( new ThemeHighEpo() )->register();
 		$phantom->register();
 		( new StorefrontStock( $phantom, $boms, $matcher ) )->register();
+		( new CartPricing( $boms, $matcher ) )->register();
 		( new InventoryPage() )->register();
 		( new ManufacturePage() )->register();
 		( new Settings() )->register();

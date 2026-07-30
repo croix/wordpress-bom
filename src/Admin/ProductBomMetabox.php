@@ -62,12 +62,13 @@ final class ProductBomMetabox {
 	public function render_panel(): void {
 		global $post;
 
-		$product_id   = $post->ID;
-		$mode_meta    = get_post_meta( $product_id, '_wcbom_mode', true );
-		$mode         = '' !== $mode_meta ? $mode_meta : 'standard';
-		$is_component = 'yes' === get_post_meta( $product_id, '_wcbom_is_component', true );
-		$unit_meta    = get_post_meta( $product_id, '_wcbom_unit', true );
-		$unit         = '' !== $unit_meta ? $unit_meta : 'ea';
+		$product_id      = $post->ID;
+		$mode_meta       = get_post_meta( $product_id, '_wcbom_mode', true );
+		$mode            = '' !== $mode_meta ? $mode_meta : 'standard';
+		$is_component    = 'yes' === get_post_meta( $product_id, '_wcbom_is_component', true );
+		$unit_meta       = get_post_meta( $product_id, '_wcbom_unit', true );
+		$unit            = '' !== $unit_meta ? $unit_meta : 'ea';
+		$weight_from_bom = 'yes' === get_post_meta( $product_id, '_wcbom_weight_from_bom', true );
 
 		echo '<div id="wcbom_bom_data" class="panel woocommerce_options_panel">';
 		echo '<div class="options_group">';
@@ -106,6 +107,15 @@ final class ProductBomMetabox {
 					'sheet' => __( 'Sheets', 'wcbom' ),
 				),
 				'value'   => $unit,
+			)
+		);
+
+		woocommerce_wp_checkbox(
+			array(
+				'id'          => '_wcbom_weight_from_bom',
+				'label'       => __( 'Weight from BOM', 'wcbom' ),
+				'description' => __( 'Override this product\'s cart/shipping weight with the sum of its resolved BOM lines\' component weights (Σ weight × qty), instead of the Shipping tab\'s fixed weight field. Leave unchecked for premade/manufactured products that already have a correct fixed weight.', 'wcbom' ),
+				'value'       => $weight_from_bom ? 'yes' : 'no',
 			)
 		);
 
@@ -154,8 +164,9 @@ final class ProductBomMetabox {
 	}
 
 	/**
-	 * Saves the mode/component/unit fields on product save. BOM lines
-	 * themselves are saved separately via the REST API, not this form post.
+	 * Saves the mode/component/unit/weight-toggle fields on product save.
+	 * BOM lines themselves are saved separately via the REST API, not this
+	 * form post.
 	 *
 	 * @param int $product_id The product being saved.
 	 */
@@ -171,6 +182,9 @@ final class ProductBomMetabox {
 
 		$unit = isset( $_POST['_wcbom_unit'] ) ? sanitize_key( wp_unslash( $_POST['_wcbom_unit'] ) ) : 'ea'; // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		update_post_meta( $product_id, '_wcbom_unit', $unit );
+
+		$weight_from_bom = isset( $_POST['_wcbom_weight_from_bom'] ) ? 'yes' : 'no'; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		update_post_meta( $product_id, '_wcbom_weight_from_bom', $weight_from_bom );
 	}
 
 	/**
@@ -226,6 +240,7 @@ final class ProductBomMetabox {
 				'productId'           => $post ? $post->ID : 0,
 				'restNamespace'       => 'wcbom/v1',
 				'variationAttributes' => $product ? $this->variation_attributes( $product ) : array(),
+				'weightFromBom'       => 'yes' === get_post_meta( $post ? $post->ID : 0, '_wcbom_weight_from_bom', true ),
 			)
 		);
 	}

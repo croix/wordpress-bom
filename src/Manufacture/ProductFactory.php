@@ -109,12 +109,17 @@ final class ProductFactory {
 	 */
 	private function save_resolved_bom( int $product_id, array $lines ): int {
 		$items = array_map(
+			// Surcharges are deliberately dropped: they price an in-cart
+			// *choice*, but this line is now an unconditional always-line
+			// on a product whose price the merchant sets directly — a
+			// carried-over surcharge would silently add to every sale.
 			static fn( BomItem $line ): array => array(
 				'component_id'    => $line->component_id,
 				'qty'             => $line->qty,
 				'condition_type'  => BomItem::CONDITION_ALWAYS,
 				'condition_key'   => null,
 				'condition_value' => null,
+				'surcharge'       => null,
 			),
 			$lines
 		);

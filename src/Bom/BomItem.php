@@ -30,6 +30,7 @@ final class BomItem {
 	 * @param string|null $condition_key   e.g. an attribute taxonomy or add-on field name.
 	 * @param string|null $condition_value e.g. a sanitized attribute term slug.
 	 * @param int         $sort_order      Display/evaluation order within the BOM.
+	 * @param float|null  $surcharge       Optional customer-facing price add-on when this line matches (§5.10).
 	 */
 	public function __construct(
 		public readonly int $item_id,
@@ -38,7 +39,8 @@ final class BomItem {
 		public readonly string $condition_type,
 		public readonly ?string $condition_key,
 		public readonly ?string $condition_value,
-		public readonly int $sort_order
+		public readonly int $sort_order,
+		public readonly ?float $surcharge = null
 	) {}
 
 	/**
@@ -54,7 +56,8 @@ final class BomItem {
 			(string) $row['condition_type'],
 			null !== $row['condition_key'] ? (string) $row['condition_key'] : null,
 			null !== $row['condition_value'] ? (string) $row['condition_value'] : null,
-			(int) $row['sort_order']
+			(int) $row['sort_order'],
+			null !== $row['surcharge'] ? (float) $row['surcharge'] : null
 		);
 	}
 }
