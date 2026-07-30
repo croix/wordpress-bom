@@ -277,6 +277,30 @@ Glitter isn't consumed in "each" — it's grams. WC stock is integer by default:
 
 ---
 
+### 5.10 Shipping weight, dimensions & price for customized products (added 2026-07-30)
+
+How physical/shipping attributes behave across our two option mechanisms — verified against WooCommerce core and the *installed* free EPO's source, not vendor marketing:
+
+**What already works natively (nothing to build):**
+- **Variations carry their own price, weight, AND dimensions (L/W/H)**, falling back to the parent product's values when a field is left empty. Since choice-type options (colors, sizes, upgraded caps) are variation attributes per the customizer decision (§10), any option that changes size/weight/price is already fully supported — per combination. There is no "stacking" arithmetic in WooCommerce: each variation is one concrete combination and you enter its true final weight/dims/price. Exact, but data entry grows with the number of combinations; acceptable at tumbler scale (a handful of physical-impact combos), bulk-editable when not.
+
+**What the free EPO cannot do (verified in its code, 2026-07-30):**
+- **Price:** the free version's frontend applies NO price changes to the cart — every pricing method (flat fee, percentage, dynamic) is Pro-only (~$39/yr). The free admin UI shows price columns in field settings, but nothing in the public class ever charges them. Consequence, reaffirming §10: **anything that costs money should be a variation attribute**; buy EPO Pro only if a personalization field itself must carry a fee (e.g. an engraving charge).
+- **Weight/dimensions: nothing, in free or Pro** — the only "weight" in its codebase is CSS `font-weight`. Add-ons plugins categorically don't touch shipping.
+
+**The gap and the plan — BOM-derived shipping weight (Phase 4.5):**
+For made-to-order products, the resolved BOM *is* the physical composition of the item — and components are WooCommerce products with their own weight fields. So compute cart weight from the recipe:
+
+> effective weight = Σ (component weight × line qty) over the resolved BOM lines
+
+- **Stacking is automatic by construction** — exactly what the developer asked for: the blank tumbler line contributes the base weight, and every conditional line that matches (upgraded metal straw, sticker pack, extra glitter grams) adds its component's weight × qty. Add a new weight-bearing material later and shipping stays correct with zero configuration — §2.4's extensibility story extends to shipping.
+- **Opt-in per product** (`_wcbom_weight_from_bom` toggle on the BOM tab), because premade/manufactured products should keep their normal WC weight field.
+- **Implementation surface:** set the weight on the cart item's product object (`woocommerce_add_cart_item` + `woocommerce_get_cart_item_from_session` → `$cart_item['data']->set_weight()`), which both classic and blocks checkout read when building shipping packages. Attribute-conditional lines resolve at cart time today (`ConditionMatcher::resolve_for_selection()`); addon-conditional lines join once EPO cart-item data is mapped (same defensive pattern as the order-item integration).
+- Components without a weight contribute 0 (and the BOM editor should hint when a line's component lacks a weight while the toggle is on). Sample data gets realistic component weights so the feature demos out of the box.
+
+**Dimensions deliberately do NOT auto-stack.** Summing L/W/H is physically meaningless (two straws don't double any axis; packing is box-dependent). Policy: dimensions come from the variation's native fields (exact, works today) or the product default. If a real need emerges for add-on-driven size changes, the defensible semantic is a per-BOM-line **dimension override with max-per-axis**: effective dims = max per axis across the base product and every resolved line that declares an override (an upgraded lid that makes the package taller raises only H). Deferred until a tester actually needs it — recorded here so the semantics aren't re-invented badly later.
+
+
 ## 6. Suggested features you didn't mention (recommend building)
 
 1. **Stock ledger / audit trail** (§2.5) — without it, "why is my blank count wrong?" is unanswerable. *Build in phase 1.*
@@ -349,6 +373,10 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 ### Phase 4 — Manufacture orders (~3–4 days)
 - MO CRUD screen, draft/complete/reverse (partial), snapshots, scrap handling, `ProductFactory` (new-listing-from-template flow), pick list print view.
 - ✅ Demo: the exact scenario from the brief — manufacture 12 pink glitter tumblers, new listing appears with stock 12, blanks −12; reverse 4 → stock 8, blanks +4.
+
+### Phase 4.5 — BOM-derived shipping weight (~0.5–1 day, added 2026-07-30)
+- Per §5.10: opt-in per-product toggle; cart-item weight = Σ(component weight × qty) over resolved BOM lines via the cart-item filters; BOM editor hint for weightless components; sample components gain realistic weights.
+- ✅ Demo: toggle on, add Pink/Upgraded to cart → cart shipping weight = blank + glitter grams + epoxy + cap + metal straw exactly; switch to Standard straw → weight drops by the straw delta alone.
 
 ### Phase 5 — Reporting, alerts, import/export, API (~2–3 days)
 - Ledger browser + CSV export, buildable/usage reports, low-component-stock digest, CSV BOM import/export, REST endpoints, WP-CLI audit/recompute.

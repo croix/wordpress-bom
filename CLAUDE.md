@@ -91,6 +91,7 @@ docker compose exec -T cli wp wcbom seed --path=/var/www/html
 - [x] Phase 3: phantom (buildable) stock — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 3.5: inventory management screen (receive / count / adjust) — **done and verified 2026-07-30, see Progress Log**
 - [ ] Phase 4: manufacture orders (build/reverse)
+- [ ] Phase 4.5: BOM-derived shipping weight — added 2026-07-30, spec in BUILD_PLAN §5.10
 - [ ] Phase 5: reports, import/export, REST, CLI
 - [ ] Phase 6: hardening, tests, release prep
 
@@ -101,6 +102,16 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Scope addition: shipping weight/dims/price for customizations (§5.10, Phase 4.5)
+
+the developer asked whether option-driven customizations can alter shipping weight/size and price, and whether weight changes stack. Findings (verified against WC core behavior and the *installed* free EPO's source — its only "weight" is CSS `font-weight`, and its free frontend applies no prices; all EPO pricing is Pro-only ~$39/yr):
+
+- **Variation attributes already carry per-variation price, weight, and dimensions natively** (parent fallback when empty) — but as concrete per-combination values, no delta stacking. Fine at tumbler scale.
+- **Add-ons change nothing physical in EPO free or Pro** — this is the gap.
+- **Planned fix (Phase 4.5, spec §5.10): BOM-derived shipping weight** — cart weight = Σ(component weight × qty) over the resolved BOM lines, opt-in per product. Stacking is automatic by construction (base blank + each matching conditional line), and future materials stay shipping-correct with zero config. Implemented via the cart-item product object (`woocommerce_add_cart_item`/`woocommerce_get_cart_item_from_session` → `set_weight()`), which both checkout types read.
+- **Dimensions deliberately don't auto-stack** (physically meaningless to sum axes). Variation-level dims cover it today; if ever needed, §5.10 records the defensible semantic — per-BOM-line dimension override, max-per-axis — so it isn't reinvented badly later.
+- Price stacking from add-ons would require EPO Pro; the standing rule stays "anything that costs money is a variation attribute."
 
 ### 2026-07-30 — Sample data as a shipping feature (install/remove from the Inventory screen)
 
