@@ -10,6 +10,7 @@
  * Author:            the developer
  * Text Domain:       wcbom
  * Domain Path:       /languages
+ * Update URI:        https://github.com/croix/wordpress-bom
  *
  * @package WCBOM
  */

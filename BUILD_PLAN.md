@@ -480,3 +480,49 @@ In order consumption, the `_wcbom_consumed` snapshot meta is written *after* the
 ### 13.7 Recovery tooling (Phase 5 `wp wcbom audit` — consolidated checklist)
 
 The audit command is the recovery net for everything above. It must detect: (a) WC `_stock` ≠ last ledger `stock_after` per product (external/untracked edits — informational); (b) orders with consumption ledger rows but missing snapshot meta (13.5 — offer rebuild); (c) MOs in a non-terminal state older than N minutes (crashed mid-flight — always safe to resume or mark failed, because of 13.6's all-or-nothing step); (d) `wcbom_ops` rows with no corresponding ledger activity (a claimed key whose operation never committed — informational, the retry path handles it).
+
+## 14. Distribution & updates (added 2026-07-30)
+
+The plugin ships as a normal installable zip, with updates delivered from GitHub through WordPress's standard update UI — no wordpress.org listing required. Built 2026-07-30; this section is the design + release runbook.
+
+### 14.1 How GitHub-powered updates work
+
+WordPress 5.8+ supports third-party update channels natively: a plugin declares `Update URI:` in its header, and core fires an `update_plugins_{$hostname}` filter during every update check. Our `Updates\GitHubUpdater` hooks `update_plugins_github.com`, asks the GitHub Releases API for the latest release (cached 6h in a transient; cleared when the user clicks Dashboard → Updates → "Check Again"), compares versions, and hands WordPress the release's zip asset URL. From there it's a completely normal WordPress update: the "update available" row, one-click update, auto-update toggle — all standard.
+
+Two guards worth knowing about:
+- **The updater only activates when the installed folder is `wc-bom-stock`** (the release zip's root). WordPress replaces the plugin folder using the zip's root name on update, so a folder mismatch would strand the old copy. This also makes the updater inert in the wp-env dev mount (`wordpress-bom`) — dev never sees phantom updates.
+- All failure modes (API down, rate-limited, repo unreachable, no releases yet) cache a "no update" result and stay silent. An update check can never break a site.
+
+### 14.2 The private-repo caveat (decision needed before first external tester)
+
+**GitHub's API returns 404 for private repos to unauthenticated callers — and this repo is currently private.** Tester sites can't see releases until one of:
+1. **Make the repo public** (simplest; code becomes public).
+2. **Keep it private; testers add a token**: `define( 'WCBOM_GITHUB_TOKEN', '...' );` in wp-config.php (a fine-grained, read-only, this-repo-only token). The updater sends it when defined. Fine for a handful of trusted testers; clumsy at scale.
+3. **A separate public releases repo** (zips + release entries only, code stays private) — point `Update URI`/updater there later; one-line change.
+
+Until decided, everything still works — checks just no-op silently.
+
+### 14.3 Release workflow (what the developer actually does)
+
+1. Bump `Version:` in `wc-bom-stock.php` **and** the `WCBOM_VERSION` constant (and `Schema::DB_VERSION` if the schema changed).
+2. Commit and push as normal.
+3. `git tag v0.2.0 && git push origin v0.2.0`
+
+That's it. A GitHub Action (`.github/workflows/release.yml`) fires on the tag: builds JS, assembles the zip via `bin/build-release-zip.sh`, **fails the release if the tag doesn't match the plugin header version** (can't ship a mislabeled zip), and publishes a GitHub Release with the zip attached. Sites see the update within ~6h, or immediately via "Check Again". Plain pushes to main never trigger updates — releases are always a deliberate tag.
+
+Manual fallback (no Actions): `bin/build-release-zip.sh` locally, then `gh release create v0.2.0 dist/wc-bom-stock-0.2.0.zip`.
+
+### 14.4 The release zip
+
+Built by `bin/build-release-zip.sh` into `dist/` (gitignored). Rooted at **`wc-bom-stock/`** — this becomes the installed folder name and must never change between releases (see 14.1). Contains runtime files only: bootstrap + `uninstall.php`, `src/`, `assets/build/` (compiled JS, no `assets/src`), and a freshly generated `--no-dev` Composer autoloader (`vendor/` — no packages, just the PSR-4 autoloader the bootstrap requires). Excludes all dev material: git/CI files, node_modules, planning docs, lint configs, tests.
+
+### 14.5 Updates must never require an uninstall — and never lose data
+
+- **File replacement is safe by design:** all plugin data lives in custom tables, product/order meta, and options — none of it in the plugin folder. WordPress's updater replaces files only.
+- **Schema migrations run automatically post-update:** `Schema::maybe_upgrade()` on `plugins_loaded` re-runs the idempotent dbDelta whenever `DB_VERSION` changes (activation hooks do NOT fire on updates — this is why the check lives on plugins_loaded). Already proven in production-like conditions: 0.1.0 → 0.2.0 (ENUM→VARCHAR, 37 live ledger rows preserved) → 0.3.0 (new table).
+- **Migration compatibility rules:** additive only in normal releases (new tables/columns/reasons); never drop/rename columns or change semantics of stored data (ledger rows, `_wcbom_consumed` snapshots, MO snapshots are historical records — new code must always read old records); destructive cleanups only in a major version with an explicit migration and changelog warning.
+- Downgrades are not supported (standard WordPress practice); the ledger/audit trail is the recovery net if anyone force-installs an older zip.
+
+### 14.6 Uninstall data policy
+
+Deleting the plugin from wp-admin keeps all data by default — `uninstall.php` only drops the tables when the merchant has explicitly enabled **"Remove all data on uninstall"** (WooCommerce → Settings → Advanced → BOM & Stock, unchecked by default; built 2026-07-30). Deactivate-then-reinstall, updates, and accidental deletions therefore never lose the ledger, BOMs, or manufacture history. The settings text spells out exactly what would be deleted.

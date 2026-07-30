@@ -102,6 +102,18 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
 
+### 2026-07-30 — Distribution & updates: GitHub-powered update channel built (§14)
+
+the developer asked whether the GitHub repo can serve WordPress-native updates to zip-installed users, what the release workflow is, and whether updates/uninstalls are data-safe. Full design is **BUILD_PLAN §14**; all of it was built and verified this session:
+
+- **`Updates\GitHubUpdater`** + `Update URI:` header — uses WP 5.8+'s native `update_plugins_{hostname}` filter fed from the GitHub Releases API (6h transient cache, flushed by Dashboard→Updates→"Check Again" via the `delete_site_transient_update_plugins` action). Two guards: only offers updates when the installed folder is exactly `wc-bom-stock` (WordPress replaces the folder using the zip's root name, so a mismatched folder — like the dev mount `wordpress-bom` — must never be offered an update), and every failure mode caches "no update" silently.
+- **Releases are deliberate, never automatic:** pushing to main does nothing. The runbook (§14.3): bump `Version:` header + `WCBOM_VERSION` (+ `Schema::DB_VERSION` if schema changed) → commit → `git tag vX.Y.Z && git push origin vX.Y.Z`. The new `.github/workflows/release.yml` builds JS, runs `bin/build-release-zip.sh`, and publishes the GitHub Release with the zip attached.
+- **`bin/build-release-zip.sh`** — stages runtime files only into a zip rooted `wc-bom-stock/`, generates a `--no-dev` Composer autoloader (the PSR-4 autoloader IS a runtime requirement; dev `vendor/` is never shipped). **Refuses to build when `GITHUB_REF_NAME` doesn't match the plugin header version** — verified: `v9.9.9` against header `0.1.0` fails loudly, matching tag succeeds.
+- **`Admin\Settings`** — WooCommerce → Settings → Advanced → "BOM & Stock" section with the **"Remove all data on uninstall" checkbox, default OFF**; `uninstall.php` (built in Phase 0) already honors it.
+- **⚠ OPEN DECISION (§14.2): the repo is private, so unauthenticated tester sites can't see releases yet.** Options: make repo public / testers define `WCBOM_GITHUB_TOKEN` in wp-config.php (supported in the updater already, fine-grained read-only token) / a separate public releases-only repo. Must be decided before the first external tester. Everything no-ops silently until then.
+
+**Verified end-to-end in wp-env** (not just built): the zip's contents are runtime-only and correctly rooted; **installed the built zip as a real plugin** (dev copy deactivated first — two active copies of the same classes would fatal): activated cleanly as `wc-bom-stock` v0.1.0, and all data (BOM v5/7 lines, 70 ledger rows, buildable=40) was intact through the swap — concrete proof the "update never needs uninstall" claim holds, since data lives in tables/meta, not plugin files. Updater in the properly-named install gracefully no-opped against the private repo (returned false, cached the failure). Settings section registered, purge option 'no'. **Then deleted the zip-installed copy via `wp plugin delete` — which really runs uninstall.php — and all 70 ledger rows survived**, demonstrating the keep-data-by-default uninstall policy live. Dev mount reactivated after; debug.log empty throughout.
+
 ### 2026-07-30 — Phase 3.5 complete: Inventory management screen, verified end-to-end
 
 **What was built** (per BUILD_PLAN §5.7):

@@ -12,6 +12,7 @@ namespace WCBOM;
 use WCBOM\Admin\DeletionGuard;
 use WCBOM\Admin\InventoryPage;
 use WCBOM\Admin\ProductBomMetabox;
+use WCBOM\Admin\Settings;
 use WCBOM\Bom\BomRepository;
 use WCBOM\Bom\ConditionMatcher;
 use WCBOM\Integrations\ThemeHighEpo;
@@ -24,6 +25,7 @@ use WCBOM\Stock\OperationGuard;
 use WCBOM\Stock\PhantomStock;
 use WCBOM\Stock\StockService;
 use WCBOM\Stock\StorefrontStock;
+use WCBOM\Updates\GitHubUpdater;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -76,6 +78,8 @@ final class Plugin {
 		$phantom->register();
 		( new StorefrontStock( $phantom, $boms, $matcher ) )->register();
 		( new InventoryPage() )->register();
+		( new Settings() )->register();
+		( new GitHubUpdater() )->register();
 
 		add_action(
 			'rest_api_init',

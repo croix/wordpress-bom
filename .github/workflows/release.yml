@@ -1,0 +1,44 @@
+# Release automation (BUILD_PLAN.md §14.3): pushing a v* tag builds the
+# distributable zip and publishes it as a GitHub Release, which every
+# install's update checker then picks up. Plain pushes never release.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: composer
+
+      - name: Build JS
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build release zip (fails if tag != plugin header version)
+        run: bash bin/build-release-zip.sh
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.zip \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
