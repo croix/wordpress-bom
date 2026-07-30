@@ -438,3 +438,45 @@ WordPress, WooCommerce, and the customizer plugins all update on their own sched
 - **Phase 6 matrix** (already planned: WC latest + latest−1, HPOS on/off, blocks + shortcode checkout) additionally gets: WP current beta smoke test, and the §9 concurrency test on every WC major.
 - **Phase 6 hardening:** add a runtime `version_compare` guard in the bootstrap (deactivate gracefully with an admin notice below minimum WC/WP, rather than fataling).
 - **`wp wcbom audit` (Phase 5)** doubles as the drift detector — if some future WC/plugin change starts moving stock outside our ledger, the audit surfaces it as untracked drift.
+
+## 13. Write-failure & crash-safety model (added 2026-07-30)
+
+the developer's prompt: wp-admin times out, freezes, and crashes in the real world — what happens to stock writes and manufacture builds mid-flight? The model below is what the plugin guarantees, ranked from the failure mode we're already safe against to the one that needs deliberate design.
+
+### 13.1 What's already safe: half-written stock movements can't happen
+
+Every stock mutation goes through `StockService::adjust_many()`, which wraps **all** of an operation's stock writes + ledger rows in one InnoDB transaction. If PHP dies mid-operation — timeout, OOM, fatal, server restart — the MySQL connection drops and InnoDB **rolls back the uncommitted transaction automatically**. Result: either every component moved and every ledger row exists, or nothing happened at all. A 12-component manufacture consume can never land as "7 components deducted, 5 not, ledger disagrees." This is why the single-code-path hard rule exists.
+
+Timeout risk for our operations themselves is inherently low: they're a handful of indexed SQL writes (milliseconds), no remote HTTP in any write path. The realistic timeout scenarios are *around* our writes (a bloated admin page, another plugin, a slow gateway), which is exactly when the transaction guarantee matters.
+
+### 13.2 Gap fixed 2026-07-30: cache poisoning on rollback
+
+`wc_update_product_stock()` updates WordPress object caches *immediately*, before our COMMIT. On the success path that's harmless. But on ROLLBACK, a site with a **persistent object cache** (Redis/Memcached — most managed WP hosting) would keep serving the rolled-back stock value from cache while the DB has the real one. Invisible in dev (no persistent cache), corrupting in production. **Fixed:** `StockService`'s rollback path now explicitly flushes each touched product's caches (`wc_delete_product_transients` + postmeta cache group) so the next read comes from the DB.
+
+### 13.3 Gap fixed 2026-07-30: an unexpected write failure must not fatal checkout
+
+Order consumption runs inside WooCommerce's checkout/payment flow. Phase 2 already handled the *expected* failure (insufficient stock → consume negative + loud order note), but an **unexpected** Throwable — e.g. `innodb_lock_wait_timeout` under heavy concurrency — would have propagated up and fataled the customer's order-received page *after payment succeeded*. **Fixed:** per-item consumption is wrapped in a catch-all; on unexpected failure the transaction has already rolled back cleanly (13.1), and we (a) log via `wc_get_logger()` (source: `wcbom`), (b) add a ⚠ order note telling the merchant consumption failed and to reconcile, (c) let checkout complete. Bookkeeping is recoverable; a paid customer seeing a white screen is not. The missing consumption is visible three ways: the order note, the log, and `wp wcbom audit` (no ledger rows for that order).
+
+### 13.4 The sneakiest failure: the retry after a timeout that actually succeeded
+
+A gateway 504 does **not** kill PHP — the server often finishes the write after the browser gives up. The user sees an error, clicks "Receive 50" again, and now 100 arrived. This is a *duplicate submit*, not a half-write, and transactions don't help. Defense — **idempotency keys**, infrastructure added 2026-07-30 so Phases 3.5/4 build on it:
+
+- New table `wcbom_ops` (`op_key` PK + `created_at`/`user_id`/`summary`), DB_VERSION 0.3.0, and `Stock\OperationGuard::claim($op_key)` — an INSERT-first check that returns false on duplicate. Old rows are purged opportunistically (>7 days).
+- **Phase 3.5 rule:** every mutating Inventory-screen REST call sends a client-generated UUID (crypto.randomUUID(), generated when the user *opens the form*, not when they click). Server claims it before applying; a replay gets the friendly "already applied" response instead of a second application.
+- **Phase 4 rule:** manufacture orders get the same key on completion *plus* a status state machine (`draft → completed → …`) — completing an already-completed MO is a no-op by state check, so MO buttons are doubly protected.
+- Client side: disable buttons in flight; on a network error say "The request may still have completed — refresh before retrying" (safe to retry anyway, because of the key).
+
+### 13.5 Known, accepted crash window: order snapshot meta (documented, audited)
+
+In order consumption, the `_wcbom_consumed` snapshot meta is written *after* the stock transaction commits (WC order-item meta can't share our transaction without invasive restructuring). Crash in that tiny window → components consumed + ledgered, but no snapshot. The ordering is deliberate: the reverse order (snapshot first) could restore stock that was never consumed on a later cancel — silent inflation, strictly worse. With the current order the failure is *detectable and recoverable*: ledger rows exist for the order, so **`wp wcbom audit` (Phase 5) must include the check "order has `order` ledger rows but item lacks `_wcbom_consumed`"** and offer to rebuild the snapshot from those rows. (Phase 6 may revisit sharing one transaction via HPOS's order-item tables; not worth the complexity now.)
+
+### 13.6 Manufacture orders (Phase 4): design rules so a crashed build is never ambiguous
+
+1. **Create-or-find the product listing first, outside the atomic step.** An empty listing with 0 stock is a harmless orphan if we crash after creating it; retrying finds and reuses it.
+2. **Then one `StockService`-style transaction for everything money-shaped:** component deductions + ledger rows + MO item snapshot rows + finished-good stock increment + ledger row + MO status flip to `completed`. All our own tables + postmeta — one COMMIT. A crash anywhere leaves the MO in its prior state with zero stock moved (13.1), and the pre-created listing simply waits.
+3. Completion/reversal buttons carry idempotency keys (13.4) and are state-machine-guarded.
+4. Reversal follows the identical pattern (snapshot-driven, one transaction, status flip inside it).
+
+### 13.7 Recovery tooling (Phase 5 `wp wcbom audit` — consolidated checklist)
+
+The audit command is the recovery net for everything above. It must detect: (a) WC `_stock` ≠ last ledger `stock_after` per product (external/untracked edits — informational); (b) orders with consumption ledger rows but missing snapshot meta (13.5 — offer rebuild); (c) MOs in a non-terminal state older than N minutes (crashed mid-flight — always safe to resume or mark failed, because of 13.6's all-or-nothing step); (d) `wcbom_ops` rows with no corresponding ledger activity (a claimed key whose operation never committed — informational, the retry path handles it).

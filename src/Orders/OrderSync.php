@@ -59,6 +59,14 @@ final class OrderSync {
 	/**
 	 * Consumes components for every made-to-order item on the order.
 	 *
+	 * This hook runs inside checkout/payment flows, after the customer has
+	 * paid — an unexpected failure here (e.g. a lock-wait timeout under
+	 * load) must never fatal their order-received page. StockService has
+	 * already rolled back atomically by the time anything is thrown, so on
+	 * an unexpected error we log it, flag the order loudly, and let
+	 * checkout complete; `wp wcbom audit` can reconcile later.
+	 * (BUILD_PLAN.md §13.3)
+	 *
 	 * @param WC_Order $order The order whose stock WC just reduced.
 	 */
 	public function consume_for_order( WC_Order $order ): void {
@@ -67,90 +75,116 @@ final class OrderSync {
 				continue;
 			}
 
-			if ( '' !== (string) $item->get_meta( self::META_CONSUMED ) ) {
-				continue; // Already consumed (idempotency belt-and-braces on top of WC's own reduced flag).
-			}
-
-			$product = $item->get_product();
-			if ( ! $product || ProductMode::MADE_TO_ORDER !== ProductMode::resolve( $product->get_id() ) ) {
-				continue;
-			}
-
-			$bom = $this->boms->get_active_for_product( $product->get_id() );
-			if ( null === $bom && $product->is_type( 'variation' ) ) {
-				$bom = $this->boms->get_active_for_product( $product->get_parent_id() );
-			}
-			if ( null === $bom ) {
-				continue;
-			}
-
-			$lines = $this->matcher->resolve( $bom, $item );
-			if ( array() === $lines ) {
-				continue;
-			}
-
-			$item_qty = (int) $item->get_quantity();
-			$deltas   = array();
-			$snapshot = array();
-
-			foreach ( $lines as $line ) {
-				if ( ! wc_get_product( $line->component_id ) ) {
-					$order->add_order_note(
-						sprintf(
-							/* translators: 1: component product ID, 2: order item name */
-							__( 'BOM warning: component #%1$d referenced by "%2$s" no longer exists — skipped.', 'wcbom' ),
-							$line->component_id,
-							$item->get_name()
-						)
-					);
-					continue;
-				}
-
-				$deltas[ $line->component_id ] = ( $deltas[ $line->component_id ] ?? 0.0 ) - ( $line->qty * $item_qty );
-				$snapshot[]                    = array(
-					'component_id' => $line->component_id,
-					'qty_per_unit' => $line->qty,
-					'qty_total'    => $line->qty * $item_qty,
-				);
-			}
-
-			if ( array() === $deltas ) {
-				continue;
-			}
-
-			$note = sprintf( 'Order #%d: %s ×%d', $order->get_id(), $item->get_name(), $item_qty );
-
 			try {
-				$this->stock->adjust_many( $deltas, Ledger::REASON_ORDER, 'wc_order', $order->get_id(), $note );
-			} catch ( InsufficientStockException $e ) {
-				// The order is already placed/paid — we can't refuse it here.
-				// Consume anyway (going negative), and flag it loudly so the
-				// merchant knows real-world stock didn't cover this sale.
-				$this->stock->adjust_many( $deltas, Ledger::REASON_ORDER, 'wc_order', $order->get_id(), $note . ' [SHORTAGE]', true );
+				$this->consume_item( $order, $item );
+			} catch ( \Throwable $e ) {
+				wc_get_logger()->error(
+					sprintf( 'BOM consumption failed for order #%d item "%s": %s', $order->get_id(), $item->get_name(), $e->getMessage() ),
+					array( 'source' => 'wcbom' )
+				);
 				$order->add_order_note(
 					sprintf(
-						/* translators: 1: order item name, 2: shortage details */
-						__( '⚠ BOM component shortage while consuming for "%1$s": %2$s. Component stock has gone negative — check physical inventory.', 'wcbom' ),
+						/* translators: 1: order item name, 2: error message */
+						__( '⚠ BOM: component consumption FAILED for "%1$s" (%2$s). No component stock was changed for this item — adjust inventory manually or run the audit.', 'wcbom' ),
 						$item->get_name(),
 						$e->getMessage()
 					)
 				);
 			}
+		}
+	}
 
-			$item->update_meta_data(
-				self::META_CONSUMED,
-				(string) wp_json_encode(
-					array(
-						'bom_id'     => $bom->bom_id,
-						'item_qty'   => $item_qty,
-						'components' => $snapshot,
+	/**
+	 * Consumes one order item's components (the per-item body of
+	 * consume_for_order(), separated so its failures can be isolated).
+	 *
+	 * @param WC_Order              $order The order being consumed for.
+	 * @param WC_Order_Item_Product $item  The line item to consume.
+	 */
+	private function consume_item( WC_Order $order, WC_Order_Item_Product $item ): void {
+		if ( '' !== (string) $item->get_meta( self::META_CONSUMED ) ) {
+			return; // Already consumed (idempotency belt-and-braces on top of WC's own reduced flag).
+		}
+
+		$product = $item->get_product();
+		if ( ! $product || ProductMode::MADE_TO_ORDER !== ProductMode::resolve( $product->get_id() ) ) {
+			return;
+		}
+
+		$bom = $this->boms->get_active_for_product( $product->get_id() );
+		if ( null === $bom && $product->is_type( 'variation' ) ) {
+			$bom = $this->boms->get_active_for_product( $product->get_parent_id() );
+		}
+		if ( null === $bom ) {
+			return;
+		}
+
+		$lines = $this->matcher->resolve( $bom, $item );
+		if ( array() === $lines ) {
+			return;
+		}
+
+		$item_qty = (int) $item->get_quantity();
+		$deltas   = array();
+		$snapshot = array();
+
+		foreach ( $lines as $line ) {
+			if ( ! wc_get_product( $line->component_id ) ) {
+				$order->add_order_note(
+					sprintf(
+						/* translators: 1: component product ID, 2: order item name */
+						__( 'BOM warning: component #%1$d referenced by "%2$s" no longer exists — skipped.', 'wcbom' ),
+						$line->component_id,
+						$item->get_name()
 					)
+				);
+				continue;
+			}
+
+			$deltas[ $line->component_id ] = ( $deltas[ $line->component_id ] ?? 0.0 ) - ( $line->qty * $item_qty );
+			$snapshot[]                    = array(
+				'component_id' => $line->component_id,
+				'qty_per_unit' => $line->qty,
+				'qty_total'    => $line->qty * $item_qty,
+			);
+		}
+
+		if ( array() === $deltas ) {
+			return;
+		}
+
+		$note = sprintf( 'Order #%d: %s ×%d', $order->get_id(), $item->get_name(), $item_qty );
+
+		try {
+			$this->stock->adjust_many( $deltas, Ledger::REASON_ORDER, 'wc_order', $order->get_id(), $note );
+		} catch ( InsufficientStockException $e ) {
+			// The order is already placed/paid — we can't refuse it here.
+			// Consume anyway (going negative), and flag it loudly so the
+			// merchant knows real-world stock didn't cover this sale.
+			$this->stock->adjust_many( $deltas, Ledger::REASON_ORDER, 'wc_order', $order->get_id(), $note . ' [SHORTAGE]', true );
+			$order->add_order_note(
+				sprintf(
+					/* translators: 1: order item name, 2: shortage details */
+					__( '⚠ BOM component shortage while consuming for "%1$s": %2$s. Component stock has gone negative — check physical inventory.', 'wcbom' ),
+					$item->get_name(),
+					$e->getMessage()
 				)
 			);
-			$item->save();
-
-			$order->add_order_note( $this->consumption_note( $item->get_name(), $snapshot ) );
 		}
+
+		$item->update_meta_data(
+			self::META_CONSUMED,
+			(string) wp_json_encode(
+				array(
+					'bom_id'     => $bom->bom_id,
+					'item_qty'   => $item_qty,
+					'components' => $snapshot,
+				)
+			)
+		);
+		$item->save();
+
+		$order->add_order_note( $this->consumption_note( $item->get_name(), $snapshot ) );
 	}
 
 	/**

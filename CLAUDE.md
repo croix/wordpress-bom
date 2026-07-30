@@ -102,6 +102,19 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
 
+### 2026-07-30 — Crash-safety review: write-failure model documented (§13), three fixes shipped
+
+the developer asked what happens to stock writes / manufacture builds when wp-admin times out, freezes, or crashes. Full analysis is **BUILD_PLAN §13** — read it before building Phase 3.5/4, both of which have §13 design rules. Summary of what was done now:
+
+- **Documented the existing guarantee (§13.1):** every stock movement is one InnoDB transaction; PHP dying mid-operation means MySQL auto-rolls-back — a multi-component consume can never half-land. This was already true; now it's written down as the reason the single-`StockService`-path rule exists.
+- **Fixed (§13.2):** rollback left poisoned object caches — `wc_update_product_stock()` updates caches *before* our COMMIT, so on ROLLBACK a persistent object cache (Redis/Memcached, i.e. most production hosting) would serve the rolled-back value indefinitely. Invisible in dev, real in prod. `StockService`'s catch path now flushes each touched product's postmeta cache + WC transients before re-throwing.
+- **Fixed (§13.3):** an *unexpected* Throwable during order consumption (e.g. `innodb_lock_wait_timeout`) would have fataled the customer's order-received page after payment. `OrderSync::consume_for_order()` now isolates each item in a catch-all: log via `wc_get_logger()` (source `wcbom`), loud ⚠ order note, checkout completes. The per-item body moved to a private `consume_item()`; consumption/restore regression re-verified passing after the restructure.
+- **Built the §13.4 idempotency infrastructure** so Phases 3.5/4 don't need a migration: new `wcbom_ops` table (op_key PK; DB_VERSION 0.3.0, migration applied+verified in env) and `Stock\OperationGuard::claim($key)` — INSERT-first, the primary key settles races; returns true exactly once per key (verified: first claim true, replay false, empty key false). **Phase 3.5/4 rule:** every mutating REST call sends a client-generated UUID created when the form *opens*; MO completion additionally state-machine-guarded. This defends against the sneakiest real-world failure: a gateway 504 doesn't kill PHP, the original write completes after the browser gave up, and the user's retry would double-apply.
+- **Documented-not-fixed (§13.5):** the tiny crash window between stock commit and `_wcbom_consumed` meta save. Ordering is deliberate (the reverse order could restore never-consumed stock — worse); the Phase 5 audit spec now includes detecting + rebuilding missing snapshots from ledger rows.
+- **§13.6/13.7:** Phase 4 MO design rules (create product first as harmless orphan, then one atomic transaction for all stock+snapshot+status; buttons idempotency-keyed and state-guarded) and the consolidated `wp wcbom audit` recovery checklist.
+
+**Testing gotcha (hit twice now — Phase 2 and again today):** after `$order->update_status(...)` triggers stock hooks, the in-memory `$order`'s item objects are stale — the hooks ran against their own freshly-loaded instance. Reading `_wcbom_consumed` from the old object shows empty even though it was written. **Always re-fetch (`wc_get_order`) before asserting on item meta in eval-file tests.**
+
 ### 2026-07-30 — Phase 3 complete: phantom (buildable) stock, verified end-to-end
 
 **What was built:**

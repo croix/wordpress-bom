@@ -134,6 +134,17 @@ final class StockService {
 			$wpdb->query( 'COMMIT' );
 		} catch ( \Throwable $e ) {
 			$wpdb->query( 'ROLLBACK' );
+
+			// wc_update_product_stock() updated object caches *before* our
+			// COMMIT — on rollback a persistent object cache (Redis etc.)
+			// would keep serving the rolled-back value while the DB has the
+			// real one. Flush every touched product so the next read comes
+			// from the database. See BUILD_PLAN.md §13.2.
+			foreach ( array_keys( $deltas ) as $touched_id ) {
+				wp_cache_delete( (int) $touched_id, 'post_meta' );
+				wc_delete_product_transients( (int) $touched_id );
+			}
+
 			throw $e;
 		}
 

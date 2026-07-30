@@ -18,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Schema {
 
-	public const DB_VERSION = '0.2.0';
+	public const DB_VERSION = '0.3.0';
 
 	private const OPTION_KEY = 'wcbom_db_version';
 
@@ -117,6 +117,15 @@ CREATE TABLE {$prefix}wcbom_stock_ledger (
   PRIMARY KEY  (ledger_id),
   KEY product_time (product_id, created_at),
   KEY ref (ref_type, ref_id)
+) {$charset_collate};
+
+CREATE TABLE {$prefix}wcbom_ops (
+  op_key VARCHAR(64) NOT NULL,
+  created_at DATETIME NOT NULL,
+  user_id BIGINT UNSIGNED NULL,
+  summary VARCHAR(255) NULL,
+  PRIMARY KEY  (op_key),
+  KEY created (created_at)
 ) {$charset_collate};
 ";
 
