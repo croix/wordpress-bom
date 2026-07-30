@@ -113,6 +113,7 @@ The next `phpunit` run recreates all tables (`WC_Install::install()` + `Schema::
 - Admin BOM editor / MO screens: React via `@wordpress/scripts`. Everything else PHP.
 - Dev env: `wp-env` (Docker) with a seeded tumbler fixture catalog (Phase 0 creates the seed script) — demo every phase against it.
 - Text domain: `wcbom`.
+- **Once the Phase 8 documentation module exists (BUILD_PLAN §5.12), any change that adds or alters a user-facing surface updates the Guide in the same session.** Building docs last prevents omission at that moment; only this rule prevents drift afterward. A coverage test enforces the page/route/CLI side of it, but prose and screenshots still need the human step — `npm run docs:screenshots` is what keeps it cheap.
 
 ## Status / next step
 
@@ -126,6 +127,7 @@ The next `phpunit` run recreates all tables (`WC_Install::install()` + `Schema::
 - [x] Phase 5: reports, import/export, REST, CLI — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 6: hardening, tests, release prep — **done and verified 2026-07-30, see Progress Log** (two real bugs found and fixed along the way: transaction-nesting in StockService/BomRepository, and a Blocks-checkout stock-reservation gap in PhantomStock)
 - [ ] Phase 7: WooCommerce native COGS integration — **spec'd 2026-07-30 (BUILD_PLAN §5.11), not yet built** (~half day)
+- [ ] Phase 8: in-app documentation & training module — **spec'd 2026-07-30 (BUILD_PLAN §5.12), not yet built** (~2–3 days). **Must be built LAST** (the developer's ordering rule) so nothing is created after it and left out of training — currently that means after Phase 7; if further features are spec'd first, this moves behind them again.
 
 Update this checklist as phases complete. Remaining open decisions are in BUILD_PLAN.md §11.
 
@@ -134,6 +136,23 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Scope addition: in-app documentation & training module spec'd (§5.12, Phase 8, built LAST)
+
+the developer asked for a full in-app documentation/training module — screenshots plus explanations of every feature, enough to train a new user — and asked whether to include the embedded YouTube training videos he'd seen in ThemeHigh EPO and CartFlows' swatches plugin. He also set the ordering rule: **docs are built last so nothing is created after them and left out of training.** Full spec is BUILD_PLAN §5.12 + Phase 8 (~2–3 days). Nothing built yet.
+
+**Factual correction worth recording, since it changed the recommendation** — checked both plugins' source, and neither actually embeds a video in its admin UI:
+- **ThemeHigh EPO** has a floating "quick widget" popup with outbound links: "Get support" and **"Video Tutorial" — a plain `target="_blank"` link to `youtube.com/watch?v=YoVPQhdwuis`**, next to a red YouTube icon. A link out, not an embed. (The icon is very likely what read as an embed — an easy misread.)
+- **Variation Swatches** has its `[youtube ...]` shortcode in **`readme.txt`**, which renders only on the wordpress.org plugin *directory* page. Nothing video-related exists anywhere in its admin UI — so for swatches there is no "page in their app with their video" to link to at all.
+
+**Decision: link to third-party videos, never embed.** Four reasons recorded so it isn't relitigated: (1) a YouTube iframe loads Google tracking into wp-admin on every render, which a store owner doesn't expect from opening a help page — if we ever embed, it must be click-to-load, never auto-load; (2) hardcoding a video ID we don't own means ThemeHigh replacing or deleting it silently points our training at a dead/wrong video, and no test of ours can catch that; (3) their video teaches their plugin and markets their Pro upgrade — useful as a pointer in our "companion plugins" section, out of place as a unit of our own curriculum; (4) only surface those pointers when the plugin is actually active, reusing `Admin\RecommendedPlugins`' existing detection. Our *own* videos get a seam in the content model (optional per-section title+URL) so recording screencasts later is a data change, not code.
+
+**Key architectural decisions in the spec:**
+- **Plain PHP, not React** (`Admin\GuidePage`), matching the deliberate existing split — React only for genuinely interactive surfaces, plain PHP for static ones (Endpoints, Settings). Docs are static; React would add a build step and §12-risk-4 `@wordpress/components` drift exposure for nothing.
+- **Content as PHP structured arrays, not Markdown.** A Markdown parser would be the plugin's first runtime dependency beyond the autoloader, and Markdown prose can't pass through `__()` — which would make the whole training module untranslatable immediately after we got a clean POT. Tradeoff noted honestly: long prose in `__()` is a bit awkward for translators, but it's standard WP practice.
+- **Screenshots generated, never hand-captured** — a dev-only Playwright script (`npm run docs:screenshots`) driving the seeded fixture at a fixed 1440×900 viewport against a fresh `wp wcbom seed --reset`, so output is deterministic and re-running it twice yields **no git diff** (that's an acceptance criterion, since non-deterministic output makes every regeneration an unreviewable diff). Hand-captured shots would rot on the first UI change, and this project has already changed admin UI repeatedly. Also flagged: `bin/build-release-zip.sh` must add `assets/docs` to its shipped list — the exact gap `readme.txt` had until Phase 6.
+- **Coverage enforced by a test, not by memory:** a PHPUnit test asserting every registered admin page, `wcbom/v1` route, and `wp wcbom` CLI subcommand maps to a documented section id — so a future feature shipped without docs *fails the suite*. Same instinct as `EndpointsPage` reading routes live rather than keeping a hand-written list. **Reasoning worth keeping:** "build docs last" prevents omission at that moment but does nothing about drift afterward, which is the larger risk — hence also a new standing rule in the Conventions section above (any user-facing change updates the Guide in the same session).
+- Plus WP-native contextual help tabs on all five screens (cheap, no screenshots, appears where a confused user looks first), deep links into live screens alongside every screenshot, and a "what this plugin deliberately doesn't do" section (no supplier POs, no dimension stacking, no live product-page price preview) — expectation-setting is training and it heads off support questions about absent features.
 
 ### 2026-07-30 — Scope addition: WooCommerce native COGS integration spec'd (§5.11, Phase 7)
 

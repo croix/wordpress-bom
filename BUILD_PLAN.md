@@ -366,6 +366,87 @@ This is deliberately the opposite of the approach `Stock\PhantomStock` had to ta
 
 ---
 
+### 5.12 In-app documentation & training module (added 2026-07-30, Phase 8)
+
+the developer asked for a full documentation/training module built into the plugin — screenshots plus explanations of every feature, enough to train a new user — and asked whether we should include the embedded YouTube training videos he'd seen in ThemeHigh EPO and CartFlows' swatches plugin. He also set the ordering rule: **documentation is built last, so nothing gets created after it and left out of training.**
+
+#### First, a correction on the third-party videos (verified in both plugins' source)
+
+Neither companion plugin actually embeds a video in its admin UI:
+
+- **ThemeHigh EPO** renders a floating "quick widget" popup containing outbound links — "Get support" (their wordpress.org forum) and **"Video Tutorial", a plain `target="_blank"` link to `youtube.com/watch?v=YoVPQhdwuis`** with a red YouTube icon. It's a link out, not an embed. (The icon is almost certainly what read as "embedded video" — an easy and reasonable misread.)
+- **Variation Swatches for WooCommerce** has a `[youtube ...]` shortcode in its **`readme.txt`**, which renders only on the wordpress.org plugin *directory* page. There is nothing video-related anywhere in its admin UI — so there is no "page in their app containing their video" to link to.
+
+#### Decision: link to third-party videos, never embed them
+
+Recommended approach, and the reasoning so it isn't relitigated:
+
+1. **Privacy.** A YouTube `<iframe>` loads Google tracking into wp-admin on every render. A store owner doesn't expect their admin to phone out to Google because they opened a help page, and plugins that pull external resources into admin are rightly viewed poorly. If we ever embed anything, it must be **click-to-load** (a static thumbnail that only fetches the iframe after a deliberate click), never auto-load.
+2. **We don't control the content.** Hardcoding a video ID we don't own means ThemeHigh silently replacing or deleting that tutorial points our training material at a dead or wrong video, and nothing in our test suite can catch it. A link that 404s is a mild annoyance; an embed that renders someone else's unrelated (or Pro-upsell) video *inside our training module* looks like our mistake.
+3. **It's their curriculum, not ours.** Their video teaches their plugin and markets their paid upgrade. That's genuinely useful as a **pointer inside our "companion plugins" section** — where a user is deliberately setting up EPO or swatches — and out of place as a unit of *our* training flow.
+4. **Show them contextually.** Only surface the EPO/swatches pointers when that plugin is actually active; `Admin\RecommendedPlugins` already does this detection, so reuse it rather than linking users to setup instructions for software they haven't installed.
+
+**Our own videos: leave a seam, don't block on them.** The content model below lets any section optionally carry a video (title + URL), so if the developer records screencasts later it's a data change, not a code change. Whether those are self-hosted or YouTube is a decision for that day; the click-to-load rule applies either way.
+
+#### Architecture: plain PHP, matching the established split
+
+A new **`Admin\GuidePage`** ("BOM & Stock → Guide"), rendered in plain PHP — **not** React. This follows the existing, deliberate convention: React for genuinely interactive surfaces (BOM editor, Inventory, Manufacturing, Reports), plain PHP for static ones (Endpoints, Settings). Documentation is static content, so React would add a build step, bundle weight, and exposure to the `@wordpress/components` runtime drift called out in §12 risk 4 — for nothing.
+
+**Content model: PHP files returning structured arrays**, one section per entry: `id`, `title`, `body` (HTML), `screenshots` (path + alt text), `links`, optional `video`. Deliberately **not** Markdown files: a parser would be the plugin's first runtime dependency beyond the autoloader, and Markdown content can't pass through `__()`, which would make the entire training module untranslatable right after we got a clean POT (see the i18n Progress Log entry). Long-form prose inside `__()` is slightly awkward for translators, but it's standard WordPress practice and keeps the text domain honest.
+
+**Also add WordPress-native contextual help tabs** (`get_current_screen()->add_help_tab()`) on each of the five plugin screens: two or three sentences plus a deep link into the matching Guide section. Cheap, native, needs no screenshots, and it appears exactly where a confused user looks first — complementing the full guide rather than duplicating it.
+
+#### Screenshots: generated, never hand-captured
+
+This is the part that determines whether the module is still accurate in six months. **Hand-captured screenshots rot on the first UI change**, and this project has already changed admin UI repeatedly (menu reorg, page retitle, modal spacing).
+
+Spec: a dev-only generator script (`bin/capture-docs-screenshots.mjs`, driven by **Playwright as a `devDependency`** — dev-only, never shipped), exposed as `npm run docs:screenshots`, that drives the seeded wp-env environment through each admin screen and writes PNGs to `assets/docs/`.
+
+Requirements that make the output stable and reviewable:
+
+- **Run against a freshly reset fixture** (`wp wcbom seed --reset`) at a **fixed viewport** (1440×900). Without determinism, every regeneration produces churn from shifting product IDs and stock numbers, and the diffs become unreviewable.
+- **Downscale to ~1200px wide and optimize**; note that these assets add real weight to a currently-tiny release zip, so keep the set tight (roughly 15–20 images, one per meaningful screen/state, not one per click).
+- **`bin/build-release-zip.sh` must add `assets/docs` to its shipped file list** — exactly the gap `readme.txt` had until Phase 6.
+- **Every screenshot needs alt text**, wrapped in `__()` like the rest of the content.
+- Screenshots come from the local fixture, so they show only our own original sample catalog (GPL, per the sample-data Progress Log entry) — no real store data, no credentials.
+
+**Also include deep links into the live screens** alongside the screenshots ("Open Component Inventory →"). Links never go stale the way images do, and a trainee ends up in the real UI anyway; the screenshot is there so they know what they're looking for before they arrive.
+
+#### Guaranteeing nothing is left out
+
+the developer's "build docs last" rule is right, but it only prevents omission *at that moment* — it does nothing about drift afterward, which is the larger risk. Two mechanisms:
+
+1. **Automated coverage enforcement** (a PHPUnit test): assert that every registered plugin admin page, every `wcbom/v1` REST route, and every `wp wcbom` CLI subcommand maps to a documented section id. A future feature shipped without documentation **fails the test suite**. This turns the requirement into something enforced rather than remembered — the same instinct behind `Admin\EndpointsPage` reading routes live instead of maintaining a hand-written list.
+2. **A standing rule** (added to CLAUDE.md's conventions): any change that adds or alters a user-facing surface updates the Guide in the same session. The generator script above is what keeps that cheap enough to actually happen.
+
+#### Content outline (the full user-facing surface, so nothing is missed)
+
+1. **Orientation** — the core mental model: components are products; BOMs are recipes; the three product modes (`standard` / `made_to_order` / `manufactured`); every stock change is ledgered.
+2. **First-run setup** — install/remove sample data, flagging a product as a component, choosing units (and why bulk materials are stocked in grams, §5.6).
+3. **Building a BOM** — the product BOM tab: lines, always vs. attribute vs. add-on conditions, surcharge, the weight-from-BOM toggle, and why saving creates a new version.
+4. **Selling made-to-order** — buildable ("phantom") stock, per-option add-to-cart blocking, what consumption writes, and how cancel/refund restore work from the snapshot.
+5. **Component Inventory** — receive vs. cycle count vs. adjust, and when to use each.
+6. **Manufacturing** — draft → complete → reverse, partial reversal, scrap, and new-product-from-template.
+7. **Reports** — all five tabs (Buildable, Low Stock, Margin, Component Usage, Ledger).
+8. **CSV import/export** — SKU-keyed, full-replace-per-parent semantics.
+9. **Settings** — uninstall data policy, low-stock digest.
+10. **For developers** — REST endpoints, WP-CLI commands, the Endpoints page.
+11. **Companion plugins** — EPO and swatches setup; **the only place third-party video links belong.**
+12. **Troubleshooting & recovery** — `wp wcbom audit`, oversell/shortage order flags, stock drift.
+13. **What this plugin deliberately doesn't do** — no supplier PO tracking, no dimension stacking (§5.10), no live product-page price preview. Setting expectations up front is training, and it prevents support questions about absent features.
+
+#### Acceptance criteria
+
+- A new user can go from a fresh install to a working made-to-order product, a completed manufacture order, and a stock receipt using the Guide alone, without asking a question.
+- `npm run docs:screenshots` regenerates every image against a reset fixture, and re-running it twice with no code change produces **no git diff** (proof the fixture and viewport really are deterministic).
+- The coverage test fails if a page/route/command is added without a doc section.
+- Contextual help tabs appear on all five plugin screens.
+- No external resource loads on the Guide page unless the user clicks a video (verify with the browser network panel — this is the privacy claim, so it gets tested, not assumed).
+
+**Estimate: ~2–3 days**, most of it writing content rather than code (screenshot tooling and the coverage test are maybe half a day combined). **Ordering: Phase 8, after Phase 7 (COGS, §5.11)** — and if anything further gets spec'd before this is built, docs move again behind it. That's precisely what the standing rule is for.
+
+---
+
 ## 6. Suggested features you didn't mention (recommend building)
 
 1. **Stock ledger / audit trail** (§2.5) — without it, "why is my blank count wrong?" is unanswerable. *Build in phase 1.*
@@ -457,7 +538,12 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 - Per §5.11: `Integrations\CogsProvider` hooking `woocommerce_get_product_cogs_total_value`; `_wcbom_cogs_from_bom` opt-in toggle on the BOM tab; extract the Σ(component price × qty) calculation out of `MarginReport` into something shared so our margin report and WooCommerce Analytics can never disagree; `MANUFACTURED` products source cost from their latest completed MO snapshot, made-to-order from the live per-variation BOM.
 - ✅ Demo: enable WooCommerce's Cost of Goods Sold feature, place an order for a made-to-order variation, and see WooCommerce's **own** Analytics report the correct BOM-derived profit — with two different variations correctly reporting different costs, and the whole integration inert when either toggle is off.
 
-**Total estimate: ~13–18 focused build days.** Phases 1–4 are the core; 5–6 can trail while the store starts using it.
+### Phase 8 — In-app documentation & training module (~2–3 days, added 2026-07-30) — **must be built LAST**
+- Per §5.12: `Admin\GuidePage` (plain PHP, structured-array content), WP-native contextual help tabs on all five screens, generated screenshots via a dev-only Playwright script (`npm run docs:screenshots`), a coverage test that fails when a page/route/CLI command has no doc section, and third-party companion-plugin videos **linked, never embedded**.
+- **Ordering rule (the developer's, 2026-07-30):** documentation is built last so nothing is created after it and left out of training. Currently that means after Phase 7 (COGS); if further features are spec'd first, this phase moves behind them again.
+- ✅ Demo: a new user follows the Guide alone from fresh install → working made-to-order product → completed manufacture order → stock receipt, with no questions; re-running the screenshot generator twice produces no git diff.
+
+**Total estimate: ~13–18 focused build days** (plus ~half a day for Phase 7 and ~2–3 days for Phase 8). Phases 1–4 are the core; 5–6 can trail while the store starts using it.
 
 ---
 
