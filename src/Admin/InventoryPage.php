@@ -48,7 +48,7 @@ final class InventoryPage {
 	public function add_menu_page(): void {
 		$this->hook_suffix = add_submenu_page(
 			PluginMenu::SLUG,
-			__( 'Inventory', 'wcbom' ),
+			__( 'Component Inventory', 'wcbom' ),
 			__( 'Inventory', 'wcbom' ),
 			'manage_woocommerce',
 			PluginMenu::SLUG,
@@ -60,7 +60,7 @@ final class InventoryPage {
 	 * Renders the mount point for the React app.
 	 */
 	public function render_page(): void {
-		echo '<div class="wrap"><div id="wcbom-inventory-root"><p>' . esc_html__( 'Loading Inventory…', 'wcbom' ) . '</p></div></div>';
+		echo '<div class="wrap"><div id="wcbom-inventory-root"><p>' . esc_html__( 'Loading Component Inventory…', 'wcbom' ) . '</p></div></div>';
 	}
 
 	/**

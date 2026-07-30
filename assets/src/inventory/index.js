@@ -105,7 +105,7 @@ function InventoryApp( { restNamespace } ) {
 	return (
 		<Card>
 			<CardBody>
-				<h1>{ __( 'Inventory', 'wcbom' ) }</h1>
+				<h1>{ __( 'Component Inventory', 'wcbom' ) }</h1>
 
 				{ notice && (
 					<Notice status={ notice.status } onRemove={ () => setNotice( null ) }>
