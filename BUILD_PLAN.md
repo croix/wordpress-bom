@@ -303,6 +303,68 @@ For made-to-order products, the resolved BOM *is* the physical composition of th
 
 **Dimensions deliberately do NOT auto-stack.** Summing L/W/H is physically meaningless (two straws don't double any axis; packing is box-dependent). Policy: dimensions come from the variation's native fields (exact, works today) or the product default. If a real need emerges for add-on-driven size changes, the defensible semantic is a per-BOM-line **dimension override with max-per-axis**: effective dims = max per axis across the base product and every resolved line that declares an override (an upgraded lid that makes the package taller raises only H). Deferred until a tester actually needs it — recorded here so the semantics aren't re-invented badly later.
 
+---
+
+### 5.11 WooCommerce native Cost of Goods Sold (COGS) integration (added 2026-07-30, Phase 7)
+
+the developer asked whether this plugin works with or integrates with WooCommerce's stock Cost of Goods Sold feature. **Today: no integration at all** — the only mention of COGS anywhere in `src/` is a docblock comment. This section specs closing that gap.
+
+#### What WC's COGS feature actually is (verified against WC 10.9.4 source, not docs)
+
+An opt-in feature (`cost_of_goods_sold` in `FeaturesController`, `enabled_by_default => false`, added ~WC 9.5, **not** experimental) that adds a per-product/per-variation **manually typed** cost field:
+
+- `WC_Product::set_cogs_value()` / `get_cogs_value()` — the merchant-entered "defined value" (stored as `_cogs_value` meta). Both **no-op/return null when the feature is disabled** (`CogsAwareTrait::cogs_is_enabled()`), so nothing we do can break a store that leaves it off.
+- `WC_Product::get_cogs_total_value()` — the *effective* value WooCommerce actually consumes, and critically **it applies the `woocommerce_get_product_cogs_total_value` filter** (`$total_value, $product`).
+- Variations add `cogs_value_is_additive`: when false (the default), the variation's own value wins if set, otherwise it inherits the parent's; when true it's parent + own.
+- **At order time**, `WC_Abstract_Order::calculate_totals()` → `calculate_cogs_total_value()` → per item `WC_Order_Item_Product::calculate_cogs_value_core()`, which reads `$product->get_cogs_total_value() × quantity` and **snapshots it onto the order item**. WC Analytics and the v4 REST API read that stored snapshot; refunds subtract proportionally (`get_cogs_refunded_for_item`).
+- Optional `wc_product_meta_lookup.cogs_total_value` column, added/removed via a WooCommerce debug tool.
+
+#### Why there's no functional overlap (and why it's worth integrating anyway)
+
+WC's COGS is a **flat number a human retypes**; it has no concept of a recipe. A merchant would have to manually re-enter every tumbler's cost each time a component's price changed. This plugin already computes the real thing bottom-up — `Reports\MarginReport` derives live cost from current component prices per resolved variation, and `Manufacture\ManufactureOrderItem::$unit_cost` snapshots true cost at build time. So the two never fight; WC's field simply sits unused and stale, and its native Analytics profit numbers are wrong (or zero) for exactly the products this plugin exists to manage.
+
+The win: feed our already-correct number into WooCommerce's own feature, so merchants who enable COGS get accurate profit reporting in **WooCommerce's native Analytics** — not only in our custom Reports screen.
+
+#### Design decision: filter the effective value, don't write `_cogs_value` meta
+
+**Verified empirically in the dev environment before writing this spec** (WC 10.9.4, COGS feature toggled on via `FeaturesController`): hooking `woocommerce_get_product_cogs_total_value` to return a test value caused a real order's per-item COGS snapshot to come out at exactly `value × quantity` (7.77 × 3 = 23.31, matching `$order->get_cogs_total_value()`) — proving one filter is sufficient to make order snapshots, and therefore Analytics, correct. No postmeta writing required.
+
+This is deliberately the opposite of the approach `Stock\PhantomStock` had to take for stock (where mirroring into real `_stock` postmeta was *forced* on us, because WC's Store API stock reservation reads it via raw SQL — see the 2026-07-30 Progress Log entry). COGS has no such raw-SQL reader in the order path, so the clean filter approach works, and it's strictly better here:
+
+- **No stale data by construction.** A derived value that's computed on read can never drift from its inputs. Mirroring into meta would need an invalidation cascade on every component price change, every BOM save, every variation edit — the exact class of bug that bit `PhantomStock` twice (variation-cache cascade, reseed poisoning).
+- **Never overwrites merchant input.** We leave `_cogs_value` (the "defined value" the merchant sees and can type into on the product screen) completely untouched. If someone has typed a cost by hand, that field still says what they typed.
+- **Cleanly reversible.** Turn the toggle off and WooCommerce is exactly as it was — nothing to clean up, nothing written.
+
+#### Behavior spec
+
+**New `Integrations\CogsProvider`** (`Integrations/` is the established home for third-party/core-feature bridges — `Hpos.php`, `ThemeHighEpo.php`), hooking `woocommerce_get_product_cogs_total_value`:
+
+1. **Bail immediately** unless the product is `ProductMode::MADE_TO_ORDER` or `MANUFACTURED` and has a resolvable BOM — a standard product's COGS is none of our business, and returning `$value` unchanged keeps normal WooCommerce behavior intact.
+2. **Opt-in per product** via a new `_wcbom_cogs_from_bom` meta checkbox on the BOM tab, with the same parent-fallback rule as `_wcbom_weight_from_bom` (§5.10). Rationale: a merchant may deliberately want a hand-typed cost that includes overhead we don't model. Consistency with the existing weight toggle matters more than saving a click.
+3. **Cost source differs by product mode, deliberately:**
+   - `MADE_TO_ORDER` → live BOM cost, resolved against that specific variation's attributes via `ConditionMatcher::resolve_for_selection()` (identical to `MarginReport::row()`), so a Blue/Upgraded tumbler reports a different cost than Pink/Standard. Nothing has physically been built yet, so live component prices *are* the best available cost.
+   - `MANUFACTURED` → the **latest completed MO's snapshot `unit_cost`** for that product, falling back to live BOM cost if it's never been built. This is strictly more accurate: it's what the units in stock actually cost to make, not what they'd cost at today's prices. Requires one new `ManufactureRepository` query (latest completed MO for a product); the per-line `unit_cost` values are already recorded.
+4. **Labor/overhead needs no new mechanism** — §5.10 already established modeling pure-service costs as a hidden unmanaged-stock "labor" component line. Such a line has a component price, so it flows into BOM cost automatically and COGS picks it up for free.
+5. **Refactor, don't duplicate:** the Σ(component price × qty) loop currently lives inline in `MarginReport::row()`. Extract it to a shared `Reports\BomCost` (or a method on `BomRepository`) that both `MarginReport` and `CogsProvider` call, so the plugin can never report one cost in its own margin report and a different one to WooCommerce Analytics. **This is the most important structural part of the task** — two independent cost calculations that silently disagree would be worse than no integration.
+
+#### Caveats to document, not solve
+
+- **The product-edit COGS field will look empty** even when the integration is active, because it shows the *defined* value (`get_cogs_value()`) while we filter the *effective* one. Correct — we're not overwriting merchant input — but potentially confusing. Mitigation: a short read-only "Cost from BOM: $X.XX (used for WooCommerce COGS reporting)" line in the BOM tab, next to the toggle. Explicitly **not** writing the value into the field just to make the UI look consistent; that reintroduces every staleness problem the filter approach avoids.
+- **Historical orders aren't retroactively corrected.** WC snapshots COGS at order time; orders placed before enabling this keep their old (likely zero) values. Correct and expected — a snapshot is a historical record. `wp wcbom recompute` should NOT touch them.
+- **No-op when the COGS feature is off.** `get_cogs_total_value()` returns 0 before ever reaching our filter, so the integration is inert on the (default) disabled setting. Worth stating plainly in `readme.txt` so nobody reports it as a bug.
+
+#### Acceptance tests (extend §9)
+
+14. With the COGS feature **off**, the filter is inert and no product/order COGS value changes.
+15. With COGS **on** and the toggle on, a made-to-order variation's `get_cogs_total_value()` equals its BOM cost for that exact attribute combination — and two variations with different conditional lines report *different* costs.
+16. A real order for such a variation snapshots per-item COGS = BOM cost × quantity (the exact mechanism verified by hand above; make it a regression test).
+17. A `MANUFACTURED` product reports its latest completed MO's snapshot unit cost, not live BOM cost — and correctly falls back to live BOM cost when never built.
+18. `MarginReport`'s cost and `CogsProvider`'s cost agree for the same product/variation (the shared-calculation guarantee).
+19. A standard (non-BOM) product's COGS is completely untouched.
+
+**Estimate: ~half a day.** Low risk: one filter, one opt-in toggle, one extracted shared calculation, no schema change, no migration, and inert unless a merchant opts into both WC's feature and ours.
+
+---
 
 ## 6. Suggested features you didn't mention (recommend building)
 
@@ -391,6 +453,10 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 - HPOS on/off matrix, blocks vs. shortcode checkout, PHP 8.1/8.3, WC latest + latest−1.
 - Uninstall behavior (keep data by default; opt-in purge). Readme, inline docs, i18n (`wcbom` text domain).
 
+### Phase 7 — WooCommerce native COGS integration (~half day, added 2026-07-30)
+- Per §5.11: `Integrations\CogsProvider` hooking `woocommerce_get_product_cogs_total_value`; `_wcbom_cogs_from_bom` opt-in toggle on the BOM tab; extract the Σ(component price × qty) calculation out of `MarginReport` into something shared so our margin report and WooCommerce Analytics can never disagree; `MANUFACTURED` products source cost from their latest completed MO snapshot, made-to-order from the live per-variation BOM.
+- ✅ Demo: enable WooCommerce's Cost of Goods Sold feature, place an order for a made-to-order variation, and see WooCommerce's **own** Analytics report the correct BOM-derived profit — with two different variations correctly reporting different costs, and the whole integration inert when either toggle is off.
+
 **Total estimate: ~13–18 focused build days.** Phases 1–4 are the core; 5–6 can trail while the store starts using it.
 
 ---
@@ -410,6 +476,8 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 11. Component trashed while in active BOM → blocked with message.
 12. Phantom stock on shop grid with 200 products → no N+1 queries (assert query count).
 13. `wp wcbom audit` detects a manual wp-admin stock edit as untracked drift (report-only).
+
+*Phase 7 (COGS integration, §5.11) adds scenarios 14–19 — listed in that section rather than repeated here.*
 
 ---
 
