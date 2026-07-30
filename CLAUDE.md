@@ -101,6 +101,15 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
 
+### 2026-07-30 — Dependency risk review; dev env pinned to stable versions
+
+Before starting Phase 2, the developer asked for an evaluation of what WP/WooCommerce/plugin updates could break and how to minimize it. Full analysis written up as **BUILD_PLAN.md §12 (Dependency risk register & upgrade strategy)** — read it before touching any WC-facing surface. Highlights:
+
+- **Discovered live drift while checking:** the unpinned `.wp-env.json` zips had installed **WooCommerce 11.0.0-rc.2** (a release candidate) into the dev env; stable was 10.9.4. All of Phase 0/1's browser verification had unknowingly run against the RC.
+- **Fixed:** `.wp-env.json` now pins exact versions (WC 10.9.4, EPO 3.3.7, swatches 1.0.13). Upgrades are now deliberate: bump pin → rebuild → re-verify → commit (the "bump ritual" in §12). Env was destroyed and rebuilt on the pinned stable versions; all 4 plugins activate, seeder runs, and the `buildable/21` REST endpoint returns the correct result (40, bottleneck Epoxy) on WC 10.9.4 with an empty debug.log — so Phase 0/1 are verified on stable too, not just the RC.
+- **Two standing rules from the risk review** (details/rationale in §12): (1) never add logic to the classic-editor metabox shell — all BOM editor behavior stays in REST + React so the coming WooCommerce block-based product editor only needs a new thin adapter; (2) never use `__experimental*`/`__unstable*` `@wordpress/components` APIs — the runtime comes from WP core's globals and drifts with WP updates.
+- The two highest-risk surfaces to re-check on every WC major: the classic product-data-panel hooks (block editor transition) and `StockService`'s direct `wp_postmeta._stock` row lock (would break silently if WC ever moves product stock to custom tables à la HPOS — the §9 concurrency test is the tripwire).
+
 ### 2026-07-29 — Phase 1 complete: ledger, StockService, BOM editor, verified end-to-end
 
 **Phase 1 is done and fully verified**, same session/machine as Phase 0 above.

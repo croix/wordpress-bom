@@ -380,3 +380,41 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 2. Whether negative component stock is ever allowed (setting; default **off**).
 3. Whether phantom stock shows an exact number or just in/out-of-stock to customers (setting; default: show number, respecting WC's "stock display format" option).
 4. Hosting/deploy target for the store itself (plugin is host-agnostic; note Sliquid's other apps are Cloudflare — a WP store won't be, but the REST API keeps integration options open).
+
+## 12. Dependency risk register & upgrade strategy (added 2026-07-30)
+
+WordPress, WooCommerce, and the customizer plugins all update on their own schedules. This section lists every external surface the plugin touches, ranked by breakage risk, plus the process that keeps upgrades deliberate instead of accidental. **Proof this matters: on 2026-07-29 the unpinned dev environment silently installed WooCommerce 11.0.0-rc.2 — a release candidate — while stable was 10.9.4.**
+
+### High risk (plan around these actively)
+
+1. **WooCommerce's block-based product editor will eventually replace the classic product data panel.** Our BOM tab hooks `woocommerce_product_data_tabs`/`woocommerce_product_data_panels`/`woocommerce_process_product_meta` — classic-editor extension points that don't exist in the new React product editor WooCommerce has been building. When WC flips the default, our tab disappears for stores that adopt it.
+   *Mitigation already in the architecture:* all BOM editor logic lives in the REST API + a host-agnostic React component; the metabox is a thin mounting shell. When the block editor becomes viable/default, we write a new thin adapter for its extension points and keep the classic shell for older stores. **Rule: never add logic to the metabox shell — everything goes in REST/React so both shells stay thin.** Watch the WooCommerce developer blog for rollout announcements.
+
+2. **`StockService`'s row lock targets `wp_postmeta._stock` by direct SQL.** WooCommerce moved orders to custom tables (HPOS); product data tables are a recurring roadmap item. If product stock storage moves, our `SELECT ... FOR UPDATE` would lock a row nobody writes to anymore — locking silently stops working while everything else appears fine.
+   *Mitigation:* the lock lives in exactly one method (`StockService::adjust_many()`), so it's a one-file fix; the §9 concurrency test (two simultaneous checkouts for the last blank) is the tripwire that catches it — run that test on every WC major upgrade, not just at release.
+
+### Medium risk
+
+3. **Dev-environment version drift (proven, see above).** `.wp-env.json` now pins exact plugin versions. Upgrades happen by bumping the pin, rebuilding, and running the fixture demo/tests — git history becomes the compatibility log. Cadence: check for WC updates roughly monthly (WC releases monthly); bump promptly but deliberately.
+
+4. **`@wordpress/components` runtime drift.** `wp-scripts` externalizes `@wordpress/*` imports to the `window.wp.*` globals *served by whatever WordPress version is installed* — so the admin UI's runtime behavior changes with WP core updates, without us rebuilding anything. *Rules:* stick to long-stable components (Button, SelectControl, TextControl, ComboboxControl, Notice, Card — current usage); never touch `__experimental*`/`__unstable*` APIs; keep opting into the `__next*` forward-compatibility props. Smoke-test the BOM editor against WP beta before each WP major (fold into the Phase 6 matrix).
+
+5. **Order stock hook timing (Phase 2 surface).** `woocommerce_reduce_order_stock`/`woocommerce_restore_order_stock` are stable hooks, but *when* they fire has nuances that shift across WC versions (blocks checkout draft orders, hold-stock-minutes, payment-gateway differences). *Mitigation already designed:* consumption writes the `_wcbom_consumed` snapshot and restoration reads only that snapshot — history is insulated from hook-timing changes; only the trigger points need re-verifying per WC release (§9 tests 1–5).
+
+6. **ThemeHigh EPO order-item meta format** (Phase 2's `Integrations/ThemeHighEpo.php` reads it). Healthy today (updated 2026-07), but free plugins change formats or die. *Mitigations:* (a) the Integrations layer is the only code that knows EPO's format — swap-out cost is one class; (b) `_wcbom_consumed` snapshots mean past orders never re-read EPO data; (c) parse defensively — unrecognized format logs a warning and skips add-on-conditional lines rather than fataling; (d) attribute-conditional lines (the primary mechanism) don't involve EPO at all.
+
+### Low risk (monitor, don't engineer around)
+
+7. **Variation Swatches for WooCommerce** — purely presentational. Our BOM logic keys off variation attributes, which are WooCommerce core. If swatches breaks or is abandoned (it's the stalest of our deps: last updated 2026-03, tested only to WP 6.8.6), the storefront falls back to dropdown pickers and nothing about stock/BOM behavior changes. Replaceable with any other swatches plugin, zero data migration.
+8. **WC CRUD & public API** (`wc_get_product`, `wc_update_product_stock`, `FeaturesUtil`, product meta) — the blessed surface WooCommerce commits to backward compatibility on. This is why the hard rules say "WC CRUD only."
+9. **WordPress core surfaces** — `dbDelta`, REST API infrastructure, `pre_trash_post`/`pre_delete_post`, post meta. Among the most stable APIs in WordPress; custom tables are entirely ours.
+10. **Build toolchain** (`@wordpress/scripts`, node_modules) — build-time only. Built assets are committed, so the plugin runs on any WP site even if the toolchain rots; toolchain upgrades can happen lazily.
+
+### Upgrade process (adopt from Phase 2 onward)
+
+- **Pin everything in `.wp-env.json`** (done 2026-07-30): exact WC/EPO/swatches versions. Never test against an RC unintentionally again.
+- **Monthly-ish bump ritual:** bump pins → rebuild env → `wp wcbom seed --reset` → run the demo flows (later: the Phase 6 test suite) → commit the pin bump. Each commit documents "verified against WC X.Y.Z".
+- **Maintain `WC tested up to` in the plugin header** alongside `WC requires at least`, updated with each verified bump.
+- **Phase 6 matrix** (already planned: WC latest + latest−1, HPOS on/off, blocks + shortcode checkout) additionally gets: WP current beta smoke test, and the §9 concurrency test on every WC major.
+- **Phase 6 hardening:** add a runtime `version_compare` guard in the bootstrap (deactivate gracefully with an admin notice below minimum WC/WP, rather than fataling).
+- **`wp wcbom audit` (Phase 5)** doubles as the drift detector — if some future WC/plugin change starts moving stock outside our ledger, the audit surfaces it as untracked drift.
