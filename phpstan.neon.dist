@@ -17,3 +17,10 @@ parameters:
     bootstrapFiles:
         - vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
         - vendor/php-stubs/wp-cli-stubs/wp-cli-stubs.php
+    dynamicConstantNames:
+        # The WooCommerce stubs define this as a fixed dummy literal
+        # ('0.0.0'), which makes any version_compare() against it get
+        # constant-folded to a fake, always-true/false result — its real
+        # value depends entirely on the installed WC version, never known
+        # statically. Same treatment the extension itself gives WP_DEBUG etc.
+        - WC_VERSION

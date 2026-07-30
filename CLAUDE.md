@@ -124,7 +124,7 @@ The next `phpunit` run recreates all tables (`WC_Install::install()` + `Schema::
 - [x] Phase 4: manufacture orders (build/reverse) — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 4.5: BOM-derived shipping weight & add-on surcharges — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 5: reports, import/export, REST, CLI — **done and verified 2026-07-30, see Progress Log**
-- [ ] Phase 6: hardening, tests, release prep — **in progress**: UI/cosmetic pass, PHPUnit suite (full §9 checklist), HPOS + blocks/shortcode checkout matrix, uninstall data-policy re-verify, and readme.txt + i18n/POT all done (two real bugs found and fixed along the way — see Progress Log); remaining: §12 dependency version check-in
+- [x] Phase 6: hardening, tests, release prep — **done and verified 2026-07-30, see Progress Log** (two real bugs found and fixed along the way: transaction-nesting in StockService/BomRepository, and a Blocks-checkout stock-reservation gap in PhantomStock)
 
 Update this checklist as phases complete. Remaining open decisions are in BUILD_PLAN.md §11.
 
@@ -133,6 +133,22 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Runtime WC version guard added (a planned Phase 6 item that had been missed)
+
+While writing up the Phase 6 completion note, re-reading BUILD_PLAN.md §12 turned up an explicitly-planned item that was never actually built: "add a runtime `version_compare` guard in the bootstrap (deactivate gracefully with an admin notice below minimum WC/WP, rather than fataling)." `wc-bom-stock.php` only ever checked `class_exists('WooCommerce')` (missing entirely) — an installed-but-too-old WooCommerce would have sailed straight into `Plugin::init()` and risked a fatal on some newer API the code assumes.
+
+Added: a `WCBOM_MIN_WC_VERSION` constant (kept in sync with the `WC requires at least` header) and a `version_compare( WC_VERSION, WCBOM_MIN_WC_VERSION, '<' )` check in the `plugins_loaded` handler — below it, `deactivate_plugins()` runs and a clear admin notice explains why, instead of proceeding. Only a WC-version check; a WP-version check would be redundant since WordPress core already refuses activation below a plugin's own "Requires at least" header — there's no equivalent core enforcement for "Requires WC at least", which is why only that gap needed closing.
+
+**Real PHPStan false-positive found and fixed while building this** (not suppressed — root-caused): `php-stubs/woocommerce-stubs` defines `WC_VERSION` as a fixed dummy literal (`'0.0.0'`) for static-analysis purposes. PHPStan therefore constant-folded `version_compare(WC_VERSION, ...)` to a fake always-true result and flagged the `Schema::maybe_upgrade()` call after it as unreachable dead code. Fixed by adding `WC_VERSION` to `phpstan.neon.dist`'s `dynamicConstantNames` list — the exact mechanism `szepeviktor/phpstan-wordpress` already uses for `WP_DEBUG`/`ABSPATH`/etc., telling PHPStan the true fact that this constant's real value is only known at runtime, never statically. This is the correct fix (not a suppression): the underlying claim PHPStan was making — "this condition is always true" — was actually false in reality, so telling it the truth about the constant fixes the false positive at its root rather than hiding a real one.
+
+**Verified live**: temporarily raised `WCBOM_MIN_WC_VERSION` to `999.0`, confirmed `wp plugin list` showed the plugin auto-deactivated, and reactivating it in the browser showed the exact intended notice — "WooCommerce BOM & Stock Manager requires WooCommerce 999.0 or newer (found 10.9.4) and has been deactivated." — with the plugin correctly staying inactive despite WP's own generic "Plugin activated" banner (which just reflects that the activation *hook* ran). Restored the real minimum (8.5), reactivated, confirmed `wp wcbom audit` clean and `debug.log` empty. PHPCS/PHPStan/full 18-test PHPUnit suite all still clean afterward.
+
+### 2026-07-30 — Phase 6 complete: §12 dependency version check-in — all three pinned plugins already at latest stable
+
+Checked WooCommerce (pinned 10.9.4), ThemeHigh Extra Product Options (pinned 3.3.7), and Variation Swatches for WooCommerce (pinned 1.0.13) against wordpress.org's current stable releases via a research subagent — all three are already at the latest available version, so nothing to bump this check-in (report-only per the standing rule: never bump without explicit confirmation). No security advisories or pending major versions on any of them. `.wp-env.json`'s pins stay as-is.
+
+**This closes out Phase 6.** Everything originally scoped for it is done: PHPUnit test scaffolding + full §9 acceptance-checklist coverage (18 tests, two real transaction-nesting bugs found and fixed), the HPOS on/off × Blocks/shortcode checkout matrix (a real Blocks-checkout bug found and fixed — phantom stock never synced to real postmeta, so WooCommerce's raw-SQL stock reservation rejected every made-to-order purchase), the admin UI/cosmetic pass, the uninstall data-policy re-verify (a real gap found and fixed — `wcbom_ops` and three options were never purged), readme.txt + a clean i18n/POT pass, and this dependency check-in. Next: Phase 6 was hardening/release-prep, so the natural next step is deciding whether/when to cut the first tagged release (§14's release runbook: bump `Version:`/`WCBOM_VERSION` → commit → `git tag vX.Y.Z && git push origin vX.Y.Z`) — that's a deliberate release decision for the developer to make, not something to do unprompted. BUILD_PLAN.md §14.2's open decision (repo is private, so unauthenticated tester sites can't see GitHub releases yet) is still unresolved and should be settled before the first external tester regardless of when v0.1.0 itself ships.
 
 ### 2026-07-30 — Phase 6: readme.txt written; i18n/POT check clean
 

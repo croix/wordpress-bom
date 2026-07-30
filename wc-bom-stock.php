@@ -21,6 +21,8 @@ defined( 'ABSPATH' ) || exit;
 define( 'WCBOM_VERSION', '0.1.0' );
 define( 'WCBOM_PLUGIN_FILE', __FILE__ );
 define( 'WCBOM_PLUGIN_DIR', __DIR__ );
+// Keep in sync with the "WC requires at least" header above.
+define( 'WCBOM_MIN_WC_VERSION', '8.5' );
 
 $wcbom_autoload = __DIR__ . '/vendor/autoload.php';
 if ( file_exists( $wcbom_autoload ) ) {
@@ -50,6 +52,32 @@ add_action(
 				'admin_notices',
 				function () {
 					echo '<div class="notice notice-error"><p>' . esc_html__( 'WooCommerce BOM & Stock Manager requires WooCommerce to be installed and active.', 'wcbom' ) . '</p></div>';
+				}
+			);
+			return;
+		}
+
+		// An installed-but-too-old WooCommerce could still be "active" (WP
+		// core has no built-in "Requires WC at least" enforcement, unlike
+		// its own "Requires at least" WP-version header) — deactivate
+		// gracefully with a clear notice rather than risk fataling on a
+		// missing WC API deeper in Plugin::init(). BUILD_PLAN.md §12.
+		if ( version_compare( WC_VERSION, WCBOM_MIN_WC_VERSION, '<' ) ) {
+			deactivate_plugins( plugin_basename( WCBOM_PLUGIN_FILE ) );
+			add_action(
+				'admin_notices',
+				function () {
+					printf(
+						'<div class="notice notice-error"><p>%s</p></div>',
+						esc_html(
+							sprintf(
+								/* translators: 1: minimum required WooCommerce version, 2: installed WooCommerce version */
+								__( 'WooCommerce BOM & Stock Manager requires WooCommerce %1$s or newer (found %2$s) and has been deactivated.', 'wcbom' ),
+								WCBOM_MIN_WC_VERSION,
+								WC_VERSION
+							)
+						)
+					);
 				}
 			);
 			return;
