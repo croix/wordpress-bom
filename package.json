@@ -3,8 +3,8 @@
     "private": true,
     "version": "0.1.0",
     "scripts": {
-        "start": "wp-scripts start assets/src/bom-editor/index.js --output-path=assets/build/bom-editor",
-        "build": "wp-scripts build assets/src/bom-editor/index.js --output-path=assets/build/bom-editor",
+        "start": "wp-scripts start",
+        "build": "wp-scripts build",
         "env:start": "wp-env start",
         "env:stop": "wp-env stop",
         "env:destroy": "wp-env destroy",

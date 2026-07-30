@@ -89,7 +89,7 @@ docker compose exec -T cli wp wcbom seed --path=/var/www/html
 - [x] Phase 1: ledger + StockService + BOM editor — **done and verified 2026-07-29, see Progress Log**
 - [x] Phase 2: order consumption/restoration — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 3: phantom (buildable) stock — **done and verified 2026-07-30, see Progress Log**
-- [ ] Phase 3.5: inventory management screen (receive / count / adjust) — spec in BUILD_PLAN §5.7
+- [x] Phase 3.5: inventory management screen (receive / count / adjust) — **done and verified 2026-07-30, see Progress Log**
 - [ ] Phase 4: manufacture orders (build/reverse)
 - [ ] Phase 5: reports, import/export, REST, CLI
 - [ ] Phase 6: hardening, tests, release prep
@@ -101,6 +101,25 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Phase 3.5 complete: Inventory management screen, verified end-to-end
+
+**What was built** (per BUILD_PLAN §5.7):
+- `Rest\InventoryApi` — `GET /inventory` (component list: name, SKU, unit, on-hand, used-in-N-BOMs, last ledger movement; `?search=`/`?all=1`) and `POST /inventory/{receive,count,adjust}`. All three mutating endpoints share a `{ op_key, note?, items:[{product_id, qty}] }` shape and go through one private `apply()` that claims the op_key via `Stock\OperationGuard` (§13.4) *after* input validation but *before* calling `StockService` — ordering matters: validation failures never burn the key, so a corrected resubmission with the same key still works, while a lost-response retry after a genuine success hits the claimed key and gets the friendly "already applied" response instead of double-applying. Receive is additive; Count takes the absolute counted number and computes+returns the drift (`counted − before`) for the UI to show; Adjust requires a non-empty note and is the only one of the three that allows the result to go negative (the deliberate manual-override path). Every apply reports which made-to-order products' buildable counts changed, via the existing `products_with_always_line()` + `PhantomStock`.
+- `Admin\InventoryPage` — new "WooCommerce → Inventory" submenu page (`add_submenu_page('woocommerce', ...)`), mount point + script enqueue.
+- React UI (`assets/src/inventory/`) — component table with search, checkboxes + "Receive selected (N)" for the bulk receiving-session workflow, per-row Count/Adjust buttons opening a shared `StockModal`. Idempotency key (`crypto.randomUUID()`) generated when a modal **opens**, not on submit, per §13.4's exact rule.
+- **Multi-entry build infrastructure added:** a `webpack.config.js` now defines two named entries (`bom-editor/index`, `inventory/index`) since `@wordpress/scripts`' CLI positional-args approach can't give two entries distinct output paths without colliding on the same `index.js` filename. `package.json`'s `build`/`start` scripts simplified back to plain `wp-scripts build`/`start` (the config file is picked up automatically). **Any future admin JS entry point (Manufacture Orders in Phase 4) should be added here, not with more CLI args.**
+- Schema: `wcbom_ops` table (op_key PK) — this was actually built in the crash-safety session just before this one; Phase 3.5 is its first real consumer.
+
+**Verified end-to-end against the pinned stable stack.** The browser tool's login form wasn't cooperating with typed input this session (typed text wasn't landing before submit — worth retrying fresh at home; not a plugin bug) — full functional verification instead via `curl` with cookie-based auth (`wp-login.php` POST → cookie jar → REST calls with an `X-WP-Nonce` fetched from `admin-ajax.php?action=rest-nonce`), which is an equally valid way to exercise the real HTTP/REST stack when the browser tool is uncooperative:
+1. Confirmed the admin page itself renders the mount point, the correct built script tag, and localized `restNamespace` — proof the PHP enqueue and webpack multi-entry setup actually work, not just compile.
+2. **Exact demo scenario 1:** received 50 blanks via `POST /inventory/receive` → stock 100→150, response correctly listed the made-to-order product's updated buildable count (40, bottlenecked by Epoxy as expected from earlier phases).
+3. **Idempotency proof — the actual point of §13.4:** replayed the *identical* request (same op_key) simulating a retry-after-timeout → got `{"already_applied": true}` and stock correctly stayed at 150, not 200. This is the specific failure mode the developer asked about two turns ago, now demonstrably closed.
+4. **Exact demo scenario 2:** cycle-counted glitter at 480g against a 500g on-hand baseline via `POST /inventory/count` → response's `drift` object showed `{before: 500, counted: 480, drift: -20}` exactly, and the ledger row confirmed (`delta: -20, stock_after: 480, reason: cycle_count, note: "Q3 cycle count"`).
+5. Adjust correctly rejected a request with no note (400) and correctly applied one with a note (475 = 480 − 5, ledger `reason: manual_adjust`).
+6. `wp-content/debug.log` stayed empty through all of it. Test data reset to baseline afterward.
+
+**Next step: Phase 4** — manufacture orders. BUILD_PLAN §13.6 already specs the crash-safety design (create the product listing first as a harmless orphan; one atomic transaction for all stock+snapshot+status; idempotency keys + state-machine guard on completion/reversal buttons) — read it before starting the MO service.
 
 ### 2026-07-30 — Crash-safety review: write-failure model documented (§13), three fixes shipped
 
