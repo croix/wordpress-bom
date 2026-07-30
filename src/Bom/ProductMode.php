@@ -43,4 +43,36 @@ final class ProductMode {
 
 		return '' !== $mode ? $mode : self::STANDARD;
 	}
+
+	/**
+	 * Top-level (non-variation) product IDs whose own `_wcbom_mode` is one
+	 * of the given modes — the reporting screens' "which finished goods
+	 * do I have" query (Reports\BuildableReport/MarginReport). Deliberately
+	 * only looks at the product's own meta, not the parent-fallback
+	 * resolve() uses: a variation never carries `_wcbom_mode` itself in
+	 * practice (mode is set once on the parent), so this is the query
+	 * equivalent of "products a merchant configured this mode on".
+	 *
+	 * @param array<int,string> $modes One or more MADE_TO_ORDER/MANUFACTURED/STANDARD values.
+	 * @return array<int,int> Product IDs.
+	 */
+	public static function products_with_mode( array $modes ): array {
+		$ids = get_posts(
+			array(
+				'post_type'      => 'product',
+				'post_status'    => array( 'publish', 'private', 'draft' ),
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					array(
+						'key'     => '_wcbom_mode',
+						'value'   => $modes,
+						'compare' => 'IN',
+					),
+				),
+			)
+		);
+
+		return array_map( 'intval', $ids );
+	}
 }

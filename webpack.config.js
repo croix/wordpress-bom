@@ -7,6 +7,7 @@ module.exports = {
 		'bom-editor/index': path.resolve( __dirname, 'assets/src/bom-editor/index.js' ),
 		'inventory/index': path.resolve( __dirname, 'assets/src/inventory/index.js' ),
 		'manufacture/index': path.resolve( __dirname, 'assets/src/manufacture/index.js' ),
+		'reports/index': path.resolve( __dirname, 'assets/src/reports/index.js' ),
 	},
 	output: {
 		...defaultConfig.output,

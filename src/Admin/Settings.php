@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace WCBOM\Admin;
 
+use WCBOM\Reports\LowStockDigest;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -67,6 +69,21 @@ final class Settings {
 				'id'       => 'wcbom_purge_data_on_uninstall',
 				'type'     => 'checkbox',
 				'default'  => 'no',
+			),
+			array(
+				'title'    => __( 'Low stock digest email', 'wcbom' ),
+				'desc'     => __( 'Send a daily email listing components at or below their low-stock threshold.', 'wcbom' ),
+				'desc_tip' => __( 'Unlike WooCommerce\'s native per-product low-stock notice, this understands components: it also says how many made-to-order products a short component blocks. No email is sent on a day nothing is low.', 'wcbom' ),
+				'id'       => LowStockDigest::OPTION_ENABLED,
+				'type'     => 'checkbox',
+				'default'  => 'no',
+			),
+			array(
+				'title'    => __( 'Digest recipient', 'wcbom' ),
+				'desc_tip' => __( 'Defaults to the site admin email when left blank.', 'wcbom' ),
+				'id'       => LowStockDigest::OPTION_EMAIL,
+				'type'     => 'email',
+				'default'  => '',
 			),
 			array(
 				'type' => 'sectionend',

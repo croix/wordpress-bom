@@ -152,24 +152,25 @@ final class SampleData {
 	 */
 	private function create_components(): array {
 		$specs = array(
-			array( '24oz Blank Tumbler', 100, 'ea', true, 0.5 ),
-			array( 'Glitter - Pink', 500, 'g', false, 0.0022 ),
-			array( 'Glitter - Blue', 500, 'g', false, 0.0022 ),
-			array( 'Vinyl Sheet', 40, 'sheet', false, 0.02 ),
-			array( 'Epoxy', 200, 'ml', false, 0.0022 ),
-			array( 'Standard Straw', 300, 'ea', false, 0.02 ),
-			array( 'Upgraded Metal Straw', 50, 'ea', false, 0.05 ),
-			array( 'Standard Cap', 300, 'ea', false, 0.04 ),
-			array( 'Upgraded Cap', 50, 'ea', false, 0.06 ),
-			array( 'Sticker Pack', 100, 'ea', false, 0.01 ),
+			array( '24oz Blank Tumbler', 100, 'ea', true, 0.5, 'WCBOM-BLANK', '3.50' ),
+			array( 'Glitter - Pink', 500, 'g', false, 0.0022, 'WCBOM-GLITTER-PINK', '0.02' ),
+			array( 'Glitter - Blue', 500, 'g', false, 0.0022, 'WCBOM-GLITTER-BLUE', '0.02' ),
+			array( 'Vinyl Sheet', 40, 'sheet', false, 0.02, 'WCBOM-VINYL', '0.50' ),
+			array( 'Epoxy', 200, 'ml', false, 0.0022, 'WCBOM-EPOXY', '0.05' ),
+			array( 'Standard Straw', 300, 'ea', false, 0.02, 'WCBOM-STRAW-STD', '0.10' ),
+			array( 'Upgraded Metal Straw', 50, 'ea', false, 0.05, 'WCBOM-STRAW-UPG', '0.75' ),
+			array( 'Standard Cap', 300, 'ea', false, 0.04, 'WCBOM-CAP-STD', '0.30' ),
+			array( 'Upgraded Cap', 50, 'ea', false, 0.06, 'WCBOM-CAP-UPG', '0.60' ),
+			array( 'Sticker Pack', 100, 'ea', false, 0.01, 'WCBOM-STICKERS', '0.40' ),
 		);
 
 		$ids = array();
 
-		foreach ( $specs as list( $name, $stock, $unit, $sellable, $weight ) ) {
+		foreach ( $specs as list( $name, $stock, $unit, $sellable, $weight, $sku, $cost ) ) {
 			$product = new WC_Product_Simple();
 			$product->set_name( $name );
-			$product->set_regular_price( '0' );
+			$product->set_sku( $sku );
+			$product->set_regular_price( $cost );
 			$product->set_manage_stock( true );
 			$product->set_stock_quantity( $stock );
 			$product->set_stock_status( 'instock' );
@@ -197,6 +198,7 @@ final class SampleData {
 	private function create_premade( string $name, int $stock ): int {
 		$product = new WC_Product_Simple();
 		$product->set_name( $name );
+		$product->set_sku( 'WCBOM-PREMADE-OCEAN' );
 		$product->set_regular_price( '34.99' );
 		$product->set_manage_stock( true );
 		$product->set_stock_quantity( $stock );
@@ -225,6 +227,7 @@ final class SampleData {
 
 		$product = new WC_Product_Variable();
 		$product->set_name( 'Custom 24oz Tumbler' );
+		$product->set_sku( 'WCBOM-CUSTOM-TUMBLER' );
 		$product->set_catalog_visibility( 'visible' );
 		$product->set_status( 'publish' );
 

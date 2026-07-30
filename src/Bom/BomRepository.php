@@ -40,6 +40,24 @@ final class BomRepository {
 	}
 
 	/**
+	 * Every currently-active BOM, across all products — the CSV export's
+	 * "give me everything" query (Bom\BomCsv). Ordered by product for a
+	 * stable, readable export.
+	 *
+	 * @return array<int,Bom>
+	 */
+	public function all_active(): array {
+		global $wpdb;
+
+		$rows = $wpdb->get_results(
+			"SELECT * FROM {$wpdb->prefix}wcbom_boms WHERE is_active = 1 ORDER BY product_id ASC", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- no user input, static query.
+			ARRAY_A
+		);
+
+		return array_map( array( $this, 'hydrate' ), $rows );
+	}
+
+	/**
 	 * A specific BOM version by ID, regardless of active status — used when
 	 * resolving a snapshot reference (order-item/manufacture-order) rather
 	 * than "what applies right now".

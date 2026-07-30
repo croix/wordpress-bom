@@ -10,11 +10,15 @@ declare(strict_types=1);
 namespace WCBOM;
 
 use WCBOM\Admin\DeletionGuard;
+use WCBOM\Admin\EndpointsPage;
+use WCBOM\Admin\ImportExportHandlers;
 use WCBOM\Admin\InventoryPage;
 use WCBOM\Admin\ManufacturePage;
 use WCBOM\Admin\ProductBomMetabox;
 use WCBOM\Admin\RecommendedPlugins;
+use WCBOM\Admin\ReportsPage;
 use WCBOM\Admin\Settings;
+use WCBOM\Bom\BomCsv;
 use WCBOM\Bom\BomRepository;
 use WCBOM\Bom\ConditionMatcher;
 use WCBOM\Cart\CartPricing;
@@ -25,9 +29,16 @@ use WCBOM\Manufacture\ManufactureService;
 use WCBOM\Manufacture\ProductFactory;
 use WCBOM\Orders\OrderSync;
 use WCBOM\Orders\RefundHandler;
+use WCBOM\Reports\BuildableReport;
+use WCBOM\Reports\ComponentUsageReport;
+use WCBOM\Reports\LowStockDigest;
+use WCBOM\Reports\LowStockReport;
+use WCBOM\Reports\MarginReport;
 use WCBOM\Rest\Api;
 use WCBOM\Rest\InventoryApi;
+use WCBOM\Rest\LedgerApi;
 use WCBOM\Rest\ManufactureApi;
+use WCBOM\Rest\ReportsApi;
 use WCBOM\Rest\SampleDataApi;
 use WCBOM\Stock\Ledger;
 use WCBOM\Stock\OperationGuard;
@@ -73,14 +84,21 @@ final class Plugin {
 	 * is confirmed active.
 	 */
 	public function init(): void {
+		$ledger     = new Ledger();
 		$boms       = new BomRepository();
-		$stock      = new StockService( new Ledger() );
+		$stock      = new StockService( $ledger );
 		$matcher    = new ConditionMatcher();
 		$phantom    = new PhantomStock( $boms );
 		$guard      = new OperationGuard();
 		$mo_orders  = new ManufactureRepository();
 		$factory    = new ProductFactory( $boms, $matcher );
 		$mo_service = new ManufactureService( $mo_orders, $boms, $stock, $guard, $factory );
+
+		$buildable_report = new BuildableReport( $boms );
+		$usage_report     = new ComponentUsageReport( $boms, $ledger );
+		$low_stock_report = new LowStockReport( $boms );
+		$margin_report    = new MarginReport( $boms, $matcher );
+		$bom_csv          = new BomCsv( $boms );
 
 		( new ProductBomMetabox( $boms ) )->register();
 		( new DeletionGuard( $boms ) )->register();
@@ -92,17 +110,23 @@ final class Plugin {
 		( new CartPricing( $boms, $matcher ) )->register();
 		( new InventoryPage() )->register();
 		( new ManufacturePage() )->register();
+		( new ReportsPage() )->register();
+		( new EndpointsPage() )->register();
+		( new ImportExportHandlers( $bom_csv, $ledger ) )->register();
+		( new LowStockDigest( $low_stock_report ) )->register();
 		( new Settings() )->register();
 		( new GitHubUpdater() )->register();
 		( new RecommendedPlugins() )->register();
 
 		add_action(
 			'rest_api_init',
-			static function () use ( $boms, $stock, $guard, $mo_orders, $mo_service ) {
+			static function () use ( $boms, $stock, $guard, $mo_orders, $mo_service, $ledger, $buildable_report, $usage_report, $low_stock_report, $margin_report ) {
 				( new Api( $boms ) )->register_routes();
 				( new InventoryApi( $stock, $boms, $guard ) )->register_routes();
 				( new SampleDataApi( new SampleData() ) )->register_routes();
 				( new ManufactureApi( $mo_service, $mo_orders, $boms ) )->register_routes();
+				( new ReportsApi( $buildable_report, $usage_report, $low_stock_report, $margin_report ) )->register_routes();
+				( new LedgerApi( $ledger ) )->register_routes();
 			}
 		);
 	}

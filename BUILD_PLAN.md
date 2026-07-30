@@ -382,8 +382,9 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 - Add-on surcharges per §5.10: optional per-line surcharge in the BOM editor; the same cart-time line resolution sets price = base + Σ(matched surcharges); double-charge warning for surcharges on attribute lines with variation pricing.
 - ✅ Demo (verified, using the seeded Blue Glitter $2 surcharge in place of the brief's hypothetical sticker example): Blue/Standard added to cart → cart price $26.99 exactly ($24.99 + $2 surcharge); all four variation combinations' weight independently verified against hand-computed Σ(component weight × qty) — Pink/Standard 0.604, Pink/Upgraded 0.634, Blue/Standard 0.604, Blue/Upgraded 0.634 lbs, each exact.
 
-### Phase 5 — Reporting, alerts, import/export, API (~2–3 days)
+### Phase 5 — Reporting, alerts, import/export, API (~2–3 days) — ✅ **done and verified 2026-07-30, see CLAUDE.md Progress Log**
 - Ledger browser + CSV export, buildable/usage reports, low-component-stock digest, CSV BOM import/export, REST endpoints, WP-CLI audit/recompute.
+- ✅ Demo (verified): `wp wcbom audit --fix` detected and correctly rebuilt a deliberately-stripped order-item consumption snapshot from ledger rows, restoring stock correctly on a subsequent cancel; BOM CSV round-tripped a qty/surcharge edit through both the admin-post download/upload and `wp wcbom import`; Reports screen's five tabs (Buildable/Low Stock/Margin/Component Usage/Ledger) all verified against the seeded catalog, including Margin correctly folding surcharges into price; new Endpoints admin page lists every registered route live.
 
 ### Phase 6 — Hardening & release prep (~2–3 days)
 - Integration tests for every ledger-touching path (order, refund, cancel, MO complete/reverse, concurrent orders via parallel requests).
@@ -432,6 +433,7 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 2. Whether negative component stock is ever allowed (setting; default **off**).
 3. Whether phantom stock shows an exact number or just in/out-of-stock to customers (setting; default: show number, respecting WC's "stock display format" option).
 4. Hosting/deploy target for the store itself (plugin is host-agnostic; note Sliquid's other apps are Cloudflare — a WP store won't be, but the REST API keeps integration options open).
+5. **UI/cosmetic pass across every admin page this plugin adds** (added 2026-07-30, the developer's request) — Inventory, Manufacturing, BOM editor tab, Reports, Endpoints, Settings section. Everything so far has been built and verified for *correctness* (real data, real REST calls, live browser checks) but not reviewed for visual polish/consistency as a deliberate pass. Do this once the admin surface stops changing shape — Phase 6 (hardening/release prep) is the natural point, so it isn't redone after every subsequent phase adds another screen.
 
 ## 12. Dependency risk register & upgrade strategy (added 2026-07-30)
 

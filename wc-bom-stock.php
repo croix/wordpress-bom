@@ -30,6 +30,16 @@ unset( $wcbom_autoload );
 
 register_activation_hook( __FILE__, array( \WCBOM\Install\Schema::class, 'install' ) );
 
+register_deactivation_hook(
+	__FILE__,
+	static function () {
+		$timestamp = wp_next_scheduled( \WCBOM\Reports\LowStockDigest::HOOK );
+		if ( false !== $timestamp ) {
+			wp_unschedule_event( $timestamp, \WCBOM\Reports\LowStockDigest::HOOK );
+		}
+	}
+);
+
 add_action( 'before_woocommerce_init', array( \WCBOM\Integrations\Hpos::class, 'declare_compatibility' ) );
 
 add_action(
