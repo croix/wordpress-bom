@@ -85,7 +85,8 @@ final class SampleData {
 
 		$id_list = implode( ',', $product_ids );
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $id_list is integers from our own query.
+		// $id_list is a comma-joined list of integers from our own query, not user input.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$foreign_users = $wpdb->get_col(
 			"SELECT DISTINCT p.post_title
 			 FROM {$wpdb->prefix}wcbom_bom_items bi
@@ -95,6 +96,7 @@ final class SampleData {
 			   AND bi.component_id IN ({$id_list})
 			   AND b.product_id NOT IN ({$id_list})"
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( array() !== $foreign_users ) {
 			throw new \RuntimeException(

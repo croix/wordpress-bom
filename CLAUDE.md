@@ -90,7 +90,7 @@ docker compose exec -T cli wp wcbom seed --path=/var/www/html
 - [x] Phase 2: order consumption/restoration — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 3: phantom (buildable) stock — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 3.5: inventory management screen (receive / count / adjust) — **done and verified 2026-07-30, see Progress Log**
-- [ ] Phase 4: manufacture orders (build/reverse)
+- [x] Phase 4: manufacture orders (build/reverse) — **done and verified 2026-07-30, see Progress Log**
 - [ ] Phase 4.5: BOM-derived shipping weight & add-on surcharges — added 2026-07-30, spec in BUILD_PLAN §5.10 (surcharge schema column already shipped, DB 0.4.0)
 - [ ] Phase 5: reports, import/export, REST, CLI
 - [ ] Phase 6: hardening, tests, release prep
@@ -102,6 +102,30 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Phase 4 complete: manufacture orders (build/reverse), verified end-to-end
+
+**What was built** (per BUILD_PLAN §5.4/§13.6 — the exact scenario from the original brief):
+- `Manufacture\ManufactureOrder`/`ManufactureOrderItem`/`ManufactureRepository` — state machine `draft → completed → partially_reversed/reversed`, mirroring the `Bom`/`BomItem`/`BomRepository` pattern.
+- `Manufacture\ProductFactory` — "new product from template": duplicates a made-to-order product's template BOM, resolved against a *specific* chosen attribute combination via the **same** `ConditionMatcher::resolve_for_selection()` the storefront already uses at add-to-cart — reused, not reimplemented — into a new simple product with a fixed, unconditional (`always`-only) BOM. Deliberately created outside any atomic step (§13.6 rule 1): worst-case failure is a harmless 0-stock orphan, never a silent stock error, so it doesn't need an idempotency key.
+- `Manufacture\ManufactureService` — the orchestration layer. **Key design realization:** §13.6 rule 2's "one StockService-style transaction for everything money-shaped" is achieved for free — `StockService::adjust_many()` already accepts a *mixed-sign* delta map, so components-down and finished-good-up are one call, one atomic commit, no new transaction-management code needed. The MOI snapshot + status flip happen *after* that commit, deliberately — identical reasoning to §13.5's order-consumption snapshot ordering (a crash in that narrow window leaves ledger rows proving the movement happened but the MO still `draft`, which is detectable/recoverable, never silently wrong the other way).
+- **Real gap found and fixed before it could bite:** the idempotency design (§13.4) has a hole for *this specific* operation — if a claimed op_key's operation then fails a *business* check (insufficient stock, not a lost response), the key would stay permanently burned, blocking a legitimate corrected retry. Added `OperationGuard::release()`; `complete()`/`reverse()` release the key in a catch block whenever the underlying `StockService` call throws. Verified live: a completion blocked by insufficient stock, retried with the identical op_key plus `allow_negative:true`, succeeded — proving the release path, not just the happy path.
+- Reversal restores from the **MOI snapshot**, never the current BOM (same hard rule as order consumption). Per-component **scrap** flag: a scrapped component gets a `manual_adjust`, zero-delta *documentary* ledger row (written via `Ledger::record()` directly, not `StockService` — no actual stock changes, so routing it through the row-locking machinery would be pointless) instead of being restored.
+- `Rest\ManufactureApi` — list/get, the template/existing-product pickers, create/complete/reverse/delete. Added a **`planned` consumption preview** on draft MOs (BOM lines × qty_built vs. current stock, with a `shortage` flag per line) since `manufacture_order_items` is deliberately empty until real completion — computed fresh each request from the live BOM, not stored.
+- Admin\ManufacturePage + React UI (assets/src/manufacture): MO list with status filter, create-draft modal (existing-product restock vs. new-from-template with attribute pickers), complete modal (shortage table + "build anyway" override), reverse modal (qty + per-component scrap checkboxes), a view/print modal for the pick list. Third webpack entry (`manufacture/index`).
+
+**Verified end-to-end against the pinned stable stack** via `curl` (cookie auth + REST nonce — the browser tool's login form is still uncooperative this session) — **the exact brief scenario, byte-for-byte**:
+1. Created a draft "new from template" MO: 12 × Pink Glitter Tumbler from the Custom Tumbler template, attributes `{glitter-color: pink, straw: standard}`. `ProductFactory` correctly resolved the template's conditional BOM down to 5 concrete lines (blank/epoxy/cap always + pink glitter + standard straw matched; blue glitter and upgraded straw correctly excluded). Draft moved **zero** stock (blanks stayed 100, new product stayed 0) — confirmed before touching complete.
+2. **Completed** → blanks **100 → 88** (−12), new product stock **0 → 12**. Exactly "blanks −12... stock 12" from the brief.
+3. **Replayed the identical completion request** (same op_key) → correctly returned the already-completed order unchanged; blanks stayed 88, not double-consumed to 76.
+4. **Reversed 4 units** → new product stock **12 → 8**, blanks **88 → 92** (+4). Exactly "reverse 4 → stock 8, blanks +4" from the brief.
+5. **Shortage blocking**: a 1000-unit draft correctly flagged every line's `shortage:true` in the preview; completing without override was blocked (400, clear message) with **zero stock moved**; retrying the **same op_key** with `allow_negative:true` succeeded (blanks went negative) — the exact release-on-failure behavior the new fix targets.
+6. **Scrap-on-reversal**: reversed the remaining 8 units of the original MO scrapping glitter+epoxy → blanks/cap/straw restored exactly to baseline (92→100), glitter/epoxy stock **unchanged**, with documentary zero-delta ledger rows recorded ("Scrapped on MO #1 reversal — 120 not restored").
+7. **Restock-existing flow**: correctly refused a product with no BOM (the premade sample) with a clear message; correctly restocked a product that had one (the just-built Pink Glitter Tumbler, 0→3).
+8. **Draft deletion**: created and deleted a throwaway draft — confirmed zero stock impact.
+9. Sample-data removal's own protective guard (built two sessions ago) **correctly blocked** removing samples while this session's test MOs' resolved BOMs still referenced them — a real, unprompted confirmation that guard works, not just a scripted test. Cleaned up test artifacts, reset to a fresh sample catalog. `debug.log` stayed empty through all nine checks above.
+
+**Next step: Phase 4.5** — BOM-derived shipping weight + add-on surcharges (spec'd earlier today, §5.10; schema already shipped). Then Phase 5 (reporting/audit/import-export/CLI) — note `wp wcbom audit` now has concrete work waiting: detecting orders with ledger rows but no `_wcbom_consumed` snapshot (§13.5) and MOs stuck non-terminal (§13.7).
 
 ### 2026-07-30 — Add-on pricing without EPO Pro: BOM-line surcharges (§5.10 extended)
 

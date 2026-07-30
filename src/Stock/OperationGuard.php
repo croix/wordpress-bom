@@ -61,6 +61,25 @@ final class OperationGuard {
 	}
 
 	/**
+	 * Releases a claimed key so a later request can claim it again.
+	 *
+	 * Only call this when the caller synchronously *knows* the operation
+	 * did not apply — e.g. a claimed manufacture-order completion that
+	 * then failed an insufficient-stock check. That's a different failure
+	 * mode from the one this class exists for (§13.4's "the response was
+	 * lost but the request actually succeeded"): here there's no
+	 * ambiguity, so permanently burning the key would only block a
+	 * legitimate retry once the underlying problem is fixed.
+	 *
+	 * @param string $op_key The key to release.
+	 */
+	public function release( string $op_key ): void {
+		global $wpdb;
+
+		$wpdb->delete( $wpdb->prefix . 'wcbom_ops', array( 'op_key' => substr( trim( $op_key ), 0, 64 ) ), array( '%s' ) );
+	}
+
+	/**
 	 * Opportunistically deletes keys old enough that no legitimate retry
 	 * of their operation can still be in flight.
 	 */

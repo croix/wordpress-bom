@@ -11,6 +11,7 @@ namespace WCBOM;
 
 use WCBOM\Admin\DeletionGuard;
 use WCBOM\Admin\InventoryPage;
+use WCBOM\Admin\ManufacturePage;
 use WCBOM\Admin\ProductBomMetabox;
 use WCBOM\Admin\RecommendedPlugins;
 use WCBOM\Admin\Settings;
@@ -18,10 +19,14 @@ use WCBOM\Bom\BomRepository;
 use WCBOM\Bom\ConditionMatcher;
 use WCBOM\Install\SampleData;
 use WCBOM\Integrations\ThemeHighEpo;
+use WCBOM\Manufacture\ManufactureRepository;
+use WCBOM\Manufacture\ManufactureService;
+use WCBOM\Manufacture\ProductFactory;
 use WCBOM\Orders\OrderSync;
 use WCBOM\Orders\RefundHandler;
 use WCBOM\Rest\Api;
 use WCBOM\Rest\InventoryApi;
+use WCBOM\Rest\ManufactureApi;
 use WCBOM\Rest\SampleDataApi;
 use WCBOM\Stock\Ledger;
 use WCBOM\Stock\OperationGuard;
@@ -67,11 +72,14 @@ final class Plugin {
 	 * is confirmed active.
 	 */
 	public function init(): void {
-		$boms    = new BomRepository();
-		$stock   = new StockService( new Ledger() );
-		$matcher = new ConditionMatcher();
-		$phantom = new PhantomStock( $boms );
-		$guard   = new OperationGuard();
+		$boms       = new BomRepository();
+		$stock      = new StockService( new Ledger() );
+		$matcher    = new ConditionMatcher();
+		$phantom    = new PhantomStock( $boms );
+		$guard      = new OperationGuard();
+		$mo_orders  = new ManufactureRepository();
+		$factory    = new ProductFactory( $boms, $matcher );
+		$mo_service = new ManufactureService( $mo_orders, $boms, $stock, $guard, $factory );
 
 		( new ProductBomMetabox( $boms ) )->register();
 		( new DeletionGuard( $boms ) )->register();
@@ -81,19 +89,19 @@ final class Plugin {
 		$phantom->register();
 		( new StorefrontStock( $phantom, $boms, $matcher ) )->register();
 		( new InventoryPage() )->register();
+		( new ManufacturePage() )->register();
 		( new Settings() )->register();
 		( new GitHubUpdater() )->register();
 		( new RecommendedPlugins() )->register();
 
 		add_action(
 			'rest_api_init',
-			static function () use ( $boms, $stock, $guard ) {
+			static function () use ( $boms, $stock, $guard, $mo_orders, $mo_service ) {
 				( new Api( $boms ) )->register_routes();
 				( new InventoryApi( $stock, $boms, $guard ) )->register_routes();
 				( new SampleDataApi( new SampleData() ) )->register_routes();
+				( new ManufactureApi( $mo_service, $mo_orders, $boms ) )->register_routes();
 			}
 		);
-
-		// Phase 4: Manufacture\ManufactureService.
 	}
 }
