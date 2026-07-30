@@ -12,7 +12,13 @@ namespace WCBOM;
 use WCBOM\Admin\DeletionGuard;
 use WCBOM\Admin\ProductBomMetabox;
 use WCBOM\Bom\BomRepository;
+use WCBOM\Bom\ConditionMatcher;
+use WCBOM\Integrations\ThemeHighEpo;
+use WCBOM\Orders\OrderSync;
+use WCBOM\Orders\RefundHandler;
 use WCBOM\Rest\Api;
+use WCBOM\Stock\Ledger;
+use WCBOM\Stock\StockService;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -51,10 +57,14 @@ final class Plugin {
 	 * is confirmed active.
 	 */
 	public function init(): void {
-		$boms = new BomRepository();
+		$boms  = new BomRepository();
+		$stock = new StockService( new Ledger() );
 
 		( new ProductBomMetabox() )->register();
 		( new DeletionGuard( $boms ) )->register();
+		( new OrderSync( $stock, $boms, new ConditionMatcher() ) )->register();
+		( new RefundHandler( $stock ) )->register();
+		( new ThemeHighEpo() )->register();
 
 		add_action(
 			'rest_api_init',
@@ -63,7 +73,6 @@ final class Plugin {
 			}
 		);
 
-		// Phase 2+: Stock\Ledger/StockService wire into Orders\OrderSync;
 		// Phase 4: Manufacture\ManufactureService.
 	}
 }

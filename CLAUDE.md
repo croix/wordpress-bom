@@ -87,7 +87,7 @@ docker compose exec -T cli wp wcbom seed --path=/var/www/html
 
 - [x] Phase 0: wp-env setup, plugin scaffold, tables, fixture seeder — **done and verified 2026-07-29, see Progress Log**
 - [x] Phase 1: ledger + StockService + BOM editor — **done and verified 2026-07-29, see Progress Log**
-- [ ] Phase 2: order consumption/restoration
+- [x] Phase 2: order consumption/restoration — **done and verified 2026-07-30, see Progress Log**
 - [ ] Phase 3: phantom (buildable) stock
 - [ ] Phase 4: manufacture orders (build/reverse)
 - [ ] Phase 5: reports, import/export, REST, CLI
@@ -100,6 +100,25 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Phase 2 complete: order consumption/restoration, verified end-to-end
+
+**What was built:**
+- `Bom\ConditionMatcher` — filters a BOM's lines to those a given order item consumes. `always` passes; `attribute` compares the item's variation attributes (read from the variation product, with a `pa_*` item-meta fallback for non-variation items) against `condition_key`/`condition_value`; `addon` compares values supplied through a new **`wcbom_order_item_addon_values`** filter. Both sides go through `sanitize_title()` so stored slugs and live values compare consistently.
+- `Orders\OrderSync` — hooks `woocommerce_reduce_order_stock` / `woocommerce_restore_order_stock` (deliberately WC's *own* stock events, so consumption timing inherits all of WC's hold-stock/gateway/checkout-type nuances rather than us second-guessing them — see BUILD_PLAN §12 risk 5). Consumption resolves the BOM (variation → parent fallback), aggregates per-component deltas, calls `StockService::adjust_many()` once (atomic), writes the `_wcbom_consumed` JSON snapshot to order-item meta, and adds a human-readable order note listing exactly what was consumed. Restoration reads **only the snapshot**, never the current BOM.
+- `Orders\RefundHandler` — hooks `woocommerce_refund_created`; when `restock_items` is set, restores `qty_per_unit × refunded_units` per component from the snapshot, and accumulates `_wcbom_refund_restored_units` on the item so repeat partial refunds can't over-restore. `OrderSync::restore_for_order()` subtracts those already-refunded units, so refund-then-cancel nets out exactly.
+- `Integrations/ThemeHighEpo` — implements `wcbom_order_item_addon_values` by exposing the order item's *visible* (non-underscore) scalar meta, which is where EPO records chosen field values. Keys pass through `sanitize_key()`. Defensive per §12 risk 6: unparseable/missing data just yields no addon values (addon lines then don't match) — never a fatal.
+
+**Design decision — overselling at consumption time.** If components can't cover an order that's *already placed and paid*, refusing consumption would leave stock silently wrong. Instead `OrderSync` catches `InsufficientStockException`, re-runs the adjustment with `$allow_negative = true`, marks the ledger note `[SHORTAGE]`, and adds a loud ⚠ order note telling the merchant to check physical inventory. Preventing the oversell is Phase 3's job (phantom stock blocks add-to-cart); by the time this code runs it's too late, so surface it rather than hide it. Note this means BUILD_PLAN §11 decision 2 ("allow negative stock?") is now *only* about manufacture orders — order consumption always allows negative, by design.
+
+**Verified end-to-end** against the pinned stable stack (WC 10.9.4), via throwaway `wp eval-file` scripts (deleted after; PHPCS/PHPStan clean throughout):
+1. **Consumption** — order of Pink/Standard ×2 → processing: Blank 100→98, Pink Glitter 500→470 (15g × 2), Epoxy 200→190, Std Cap 300→298, Std Straw 300→298. Blue Glitter and Metal Straw **untouched** (their attribute conditions correctly didn't match). 5 ledger rows with correct deltas and `stock_after`, all referencing the order. Snapshot meta and order note both written.
+2. **Snapshot integrity (the important one)** — edited the BOM to 100× quantities *after* the sale, then cancelled: every component returned to exactly baseline. Restoration used the original snapshot (`bom_id:1`), not the absurd new version. This is §9 test 5 and it passes.
+3. **Partial refund + cancel, no double-restore** — order ×2 → processing, refund 1 unit with restock (exactly half of each component came back: Blank 98→99, Pink Glitter 470→485), then cancel → all components back to precise baseline. `_wcbom_refund_restored_units=1` recorded; the cancel restored only the remaining unit.
+4. **Addon-conditional consumption** — added an `addon` line (Sticker Pack when field `Add Stickers` = `Yes`), ordered the Pink/**Upgraded** variation with EPO-style visible item meta: Sticker Pack −1 (addon matched via `ThemeHighEpo`) *and* Metal Straw −1 (attribute matched via the Upgraded variation), Standard Straw untouched. Cancel restored both.
+5. Ledger totals reconcile across all tests; `wp-content/debug.log` stayed empty (zero PHP notices) throughout.
+
+**Next step: Phase 3** — phantom (buildable) stock: `Stock\PhantomStock` computing `min(floor(component_stock ÷ qty))` over always-lines with caching + invalidation on ledger writes, the storefront display/purchasability filters, and add-to-cart validation for *option-specific* components (so "upgraded metal straws are out of stock" blocks only that variation, not the whole product). This is what actually prevents the oversell that Phase 2 currently absorbs-and-flags.
 
 ### 2026-07-30 — Dependency risk review; dev env pinned to stable versions
 
