@@ -18,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Schema {
 
-	public const DB_VERSION = '0.1.0';
+	public const DB_VERSION = '0.2.0';
 
 	private const OPTION_KEY = 'wcbom_db_version';
 
@@ -108,7 +108,7 @@ CREATE TABLE {$prefix}wcbom_stock_ledger (
   product_id BIGINT UNSIGNED NOT NULL,
   delta DECIMAL(12,4) NOT NULL,
   stock_after DECIMAL(12,4) NULL,
-  reason ENUM('order','order_restore','refund','manufacture','manufacture_reverse','manual_adjust','import') NOT NULL,
+  reason VARCHAR(32) NOT NULL,
   ref_type VARCHAR(32) NULL,
   ref_id BIGINT UNSIGNED NULL,
   user_id BIGINT UNSIGNED NULL,

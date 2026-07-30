@@ -166,7 +166,7 @@ CREATE TABLE {prefix}wcbom_stock_ledger (
   product_id    BIGINT UNSIGNED NOT NULL,
   delta         DECIMAL(12,4) NOT NULL,     -- signed
   stock_after   DECIMAL(12,4) NULL,
-  reason        ENUM('order','order_restore','refund','manufacture','manufacture_reverse','manual_adjust','import') NOT NULL,
+  reason        VARCHAR(32) NOT NULL,       -- order|order_restore|refund|manufacture|manufacture_reverse|manual_adjust|import|received|cycle_count (was ENUM; widened 2026-07-30 so new movement types never need a migration)
   ref_type      VARCHAR(32) NULL,           -- 'wc_order' | 'manufacture_order' | ...
   ref_id        BIGINT UNSIGNED NULL,
   user_id       BIGINT UNSIGNED NULL,
@@ -250,12 +250,28 @@ Glitter isn't consumed in "each" — it's grams. WC stock is integer by default:
 - For bulk components, recommend stocking in the smallest sensible unit as integers (grams, ml, cm) — set `_wcbom_unit` so the UI reads "15 g" not "15". This avoids fighting WC's integer stock.
 - (Fallback: `woocommerce_stock_amount` filter can allow float stock, but integer-in-small-units is more robust with third-party plugins.)
 
-### 5.7 Import/export & CLI
+### 5.7 Inventory management screen (receive / count / adjust) — added 2026-07-30
+
+**WooCommerce → Inventory** (React admin page): every component's stock managed from one place — never open a product edit screen to change inventory. Three distinct workflows, each writing its own ledger reason so reports stay meaningful:
+
+| Action | Input | Ledger reason | Semantics |
+|---|---|---|---|
+| **Receive** | quantity received (+ optional note/PO ref) | `received` | "X more arrived" — additive, the everyday workflow |
+| **Count** | the *absolute* physically-counted number | `cycle_count` | System computes delta = counted − on-hand and shows the drift prominently; this is the cycle-count workflow |
+| **Adjust** | signed delta + required note | `manual_adjust` | Damage, shrinkage, found stock — the exception path |
+
+- Table lists all `_wcbom_is_component` products (filter/search; toggle to include all managed-stock products): name, SKU, unit, on-hand, used-in-N-BOMs, last movement (from ledger).
+- **Receiving session UX:** enter quantities against several components, submit once — one row per component in the ledger, all attributed to the acting user.
+- After any movement, show which made-to-order products' buildable counts changed (phantom stock provides this).
+- Everything goes through `StockService` — full ledger trail with user attribution, same as every other stock path. (Third-party "stock manager" plugins remain compatible but write stock outside the ledger; `wp wcbom audit` will flag their edits as drift. Prefer this screen.)
+- Ledger `reason` column becomes `VARCHAR(32)` (was ENUM) so new movement types (e.g. future `transfer`) never need a schema migration again.
+
+### 5.8 Import/export & CLI
 
 - CSV import/export of BOMs (columns: parent SKU, component SKU, qty, condition). Critical for initial setup of a large catalog and for the "expand materials later" workflow.
 - WP-CLI: `wp wcbom audit` (ledger vs. actual stock drift check), `wp wcbom recompute` (phantom stock cache rebuild), `wp wcbom import <file>`.
 
-### 5.8 REST API
+### 5.9 REST API
 
 `/wp-json/wcbom/v1/`: `boms` (CRUD), `manufacture-orders` (create/complete/reverse/list), `ledger` (read), `buildable/{product_id}`. Auth via standard WC REST keys / application passwords. Enables future dashboards or a Cloudflare Worker front-end if you ever want one.
 
@@ -279,7 +295,7 @@ Glitter isn't consumed in "each" — it's grams. WC stock is integer by default:
 ### Deliberately out of scope for v1 (note for later)
 
 - **Nested BOMs / sub-assemblies** (a manufactured item used as a component in another BOM). Schema supports it (components are just products); the phantom-stock recursion and cycle detection are the work. Design doesn't block it — defer.
-- Multi-warehouse/location stock; supplier purchase orders & receiving (use `manual_adjust`/import for receiving in v1); barcode scanning; serial/lot tracking.
+- Multi-warehouse/location stock; supplier purchase orders (receiving *is* in scope as of 2026-07-30 — §5.7's Inventory screen — but PO tracking against suppliers is not); barcode scanning; serial/lot tracking.
 
 ---
 
@@ -325,6 +341,10 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 ### Phase 3 — Phantom stock (~2 days)
 - Buildable computation + cache + invalidation; storefront stock display/validation filters; add-to-cart conditional-component checks.
 - ✅ Demo: set blanks to 3 → made-to-order product shows 3 available; buy 3 → out of stock; upgraded-straw stock 0 → only that option blocked.
+
+### Phase 3.5 — Inventory management screen (~1–2 days, added 2026-07-30)
+- **WooCommerce → Inventory** React page per §5.7: all components in one table, Receive / Count / Adjust row actions + receiving-session bulk entry, everything through `StockService` with the new `received`/`cycle_count` ledger reasons.
+- ✅ Demo: receive 50 blanks without touching the product edit screen → stock +50, ledger row, buildable count updates; cycle-count glitter at 480 g against a system 500 g → drift −20 shown and ledgered.
 
 ### Phase 4 — Manufacture orders (~3–4 days)
 - MO CRUD screen, draft/complete/reverse (partial), snapshots, scrap handling, `ProductFactory` (new-listing-from-template flow), pick list print view.

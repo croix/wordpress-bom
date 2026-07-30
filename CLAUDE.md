@@ -89,6 +89,7 @@ docker compose exec -T cli wp wcbom seed --path=/var/www/html
 - [x] Phase 1: ledger + StockService + BOM editor — **done and verified 2026-07-29, see Progress Log**
 - [x] Phase 2: order consumption/restoration — **done and verified 2026-07-30, see Progress Log**
 - [ ] Phase 3: phantom (buildable) stock
+- [ ] Phase 3.5: inventory management screen (receive / count / adjust) — added 2026-07-30, spec in BUILD_PLAN §5.7
 - [ ] Phase 4: manufacture orders (build/reverse)
 - [ ] Phase 5: reports, import/export, REST, CLI
 - [ ] Phase 6: hardening, tests, release prep
@@ -100,6 +101,15 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Scope addition: Inventory management screen (Phase 3.5); ledger reason column widened
+
+the developer confirmed the Phase 2 oversell design (paid orders consume negative + loud flag; Phase 3 prevents it up front) and asked for a stock-management workflow: **receive X more of a component, cycle count, and adjust — all from one screen**, never by opening individual product edit pages, and in preference to installing a third-party stock-manager plugin (which would write stock outside our ledger and show up as audit drift).
+
+- **New spec: BUILD_PLAN §5.7** (Import/export moved to §5.8, REST to §5.9) — "WooCommerce → Inventory" React page; three workflows with distinct ledger reasons: Receive (`received`, additive), Count (`cycle_count`, absolute count entered → system computes/displays drift), Adjust (`manual_adjust`, signed delta + required note). Receiving-session bulk entry. All through `StockService`.
+- **New build phase 3.5** (~1–2 days) slotted after Phase 3 — phantom stock stays first because it stops revenue-affecting oversells, and its buildable-count output feeds the Inventory screen's "what did this receive unlock" hint.
+- **Schema change shipped now so 3.5 needs no migration:** `wcbom_stock_ledger.reason` ENUM → `VARCHAR(32)` (DB_VERSION 0.1.0 → 0.2.0; dbDelta altered the column in place — verified all 37 existing ledger rows kept their values). New `Ledger::REASON_RECEIVED`/`REASON_CYCLE_COUNT` constants. Rationale: adding future movement types (e.g. `transfer`) must never require a migration again.
+- BUILD_PLAN's out-of-scope list updated: *receiving* is now in scope; *supplier PO tracking* remains out for v1.
 
 ### 2026-07-30 — Phase 2 complete: order consumption/restoration, verified end-to-end
 

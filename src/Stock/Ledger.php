@@ -24,6 +24,8 @@ final class Ledger {
 	public const REASON_MANUFACTURE_REVERSE = 'manufacture_reverse';
 	public const REASON_MANUAL_ADJUST       = 'manual_adjust';
 	public const REASON_IMPORT              = 'import';
+	public const REASON_RECEIVED            = 'received';
+	public const REASON_CYCLE_COUNT         = 'cycle_count';
 
 	/**
 	 * Writes one ledger row.
