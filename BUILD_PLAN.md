@@ -130,6 +130,7 @@ CREATE TABLE {prefix}wcbom_bom_items (
   condition_type ENUM('always','attribute','addon') NOT NULL DEFAULT 'always',
   condition_key  VARCHAR(191) NULL,          -- e.g. 'pa_straw' or addon field name
   condition_value VARCHAR(191) NULL,         -- e.g. 'upgraded'
+  surcharge     DECIMAL(12,4) NULL,           -- optional customer-facing price add-on when this line matches (§5.10)
   sort_order    INT NOT NULL DEFAULT 0,
   KEY bom (bom_id), KEY component (component_id)
 );
@@ -298,6 +299,8 @@ For made-to-order products, the resolved BOM *is* the physical composition of th
 - **Implementation surface:** set the weight on the cart item's product object (`woocommerce_add_cart_item` + `woocommerce_get_cart_item_from_session` → `$cart_item['data']->set_weight()`), which both classic and blocks checkout read when building shipping packages. Attribute-conditional lines resolve at cart time today (`ConditionMatcher::resolve_for_selection()`); addon-conditional lines join once EPO cart-item data is mapped (same defensive pattern as the order-item integration).
 - Components without a weight contribute 0 (and the BOM editor should hint when a line's component lacks a weight while the toggle is on). Sample data gets realistic component weights so the feature demos out of the box.
 
+**Add-on price surcharges without EPO Pro (added same day):** we are NOT locked out of add-on pricing by the free EPO. A conditional BOM line already binds an option choice to a material; an optional **`surcharge`** on the same line binds it to a customer-facing price too ("consumes 1 metal straw AND costs $5 more"). At cart time the same single line-resolution that computes weight also sets price: `base + Σ(surcharge of matched lines)` via the identical cart-item hooks — stacking automatic, identical semantics to weight. Plugin-agnostic (works with EPO free, any replacement, or plain attributes). Pure-service fees model cleanly as a hidden zero/unmanaged-stock "labor" component line with a surcharge — better bookkeeping than an invisible fee. **Guard: a choice prices through EITHER its variation OR a line surcharge, never both** (double-charge otherwise) — the BOM editor should warn when a surcharge sits on an attribute-conditional line whose variations also carry prices. Known limitation vs EPO Pro: no live price preview on the product page as options are picked; v1 convention is "(+$5)" in the option label, with the cart showing the true adjusted price. Schema: `wcbom_bom_items.surcharge DECIMAL(12,4) NULL` (shipped ahead of the feature, DB_VERSION 0.4.0, per §14.5's additive rule).
+
 **Dimensions deliberately do NOT auto-stack.** Summing L/W/H is physically meaningless (two straws don't double any axis; packing is box-dependent). Policy: dimensions come from the variation's native fields (exact, works today) or the product default. If a real need emerges for add-on-driven size changes, the defensible semantic is a per-BOM-line **dimension override with max-per-axis**: effective dims = max per axis across the base product and every resolved line that declares an override (an upgraded lid that makes the package taller raises only H). Deferred until a tester actually needs it — recorded here so the semantics aren't re-invented badly later.
 
 
@@ -374,9 +377,10 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 - MO CRUD screen, draft/complete/reverse (partial), snapshots, scrap handling, `ProductFactory` (new-listing-from-template flow), pick list print view.
 - ✅ Demo: the exact scenario from the brief — manufacture 12 pink glitter tumblers, new listing appears with stock 12, blanks −12; reverse 4 → stock 8, blanks +4.
 
-### Phase 4.5 — BOM-derived shipping weight (~0.5–1 day, added 2026-07-30)
+### Phase 4.5 — BOM-derived shipping weight & add-on surcharges (~1 day, added 2026-07-30)
 - Per §5.10: opt-in per-product toggle; cart-item weight = Σ(component weight × qty) over resolved BOM lines via the cart-item filters; BOM editor hint for weightless components; sample components gain realistic weights.
-- ✅ Demo: toggle on, add Pink/Upgraded to cart → cart shipping weight = blank + glitter grams + epoxy + cap + metal straw exactly; switch to Standard straw → weight drops by the straw delta alone.
+- Add-on surcharges per §5.10: optional per-line surcharge in the BOM editor; the same cart-time line resolution sets price = base + Σ(matched surcharges); double-charge warning for surcharges on attribute lines with variation pricing.
+- ✅ Demo: toggle on, add Pink/Upgraded to cart → cart shipping weight = blank + glitter grams + epoxy + cap + metal straw exactly; switch to Standard straw → weight drops by the straw delta alone. Sticker add-on line with a $3 surcharge → cart price rises $3 only when stickers chosen.
 
 ### Phase 5 — Reporting, alerts, import/export, API (~2–3 days)
 - Ledger browser + CSV export, buildable/usage reports, low-component-stock digest, CSV BOM import/export, REST endpoints, WP-CLI audit/recompute.

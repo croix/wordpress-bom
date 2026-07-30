@@ -18,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Schema {
 
-	public const DB_VERSION = '0.3.0';
+	public const DB_VERSION = '0.4.0';
 
 	private const OPTION_KEY = 'wcbom_db_version';
 
@@ -70,6 +70,7 @@ CREATE TABLE {$prefix}wcbom_bom_items (
   condition_type ENUM('always','attribute','addon') NOT NULL DEFAULT 'always',
   condition_key VARCHAR(191) NULL,
   condition_value VARCHAR(191) NULL,
+  surcharge DECIMAL(12,4) NULL,
   sort_order INT NOT NULL DEFAULT 0,
   PRIMARY KEY  (item_id),
   KEY bom (bom_id),

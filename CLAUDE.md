@@ -91,7 +91,7 @@ docker compose exec -T cli wp wcbom seed --path=/var/www/html
 - [x] Phase 3: phantom (buildable) stock — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 3.5: inventory management screen (receive / count / adjust) — **done and verified 2026-07-30, see Progress Log**
 - [ ] Phase 4: manufacture orders (build/reverse)
-- [ ] Phase 4.5: BOM-derived shipping weight — added 2026-07-30, spec in BUILD_PLAN §5.10
+- [ ] Phase 4.5: BOM-derived shipping weight & add-on surcharges — added 2026-07-30, spec in BUILD_PLAN §5.10 (surcharge schema column already shipped, DB 0.4.0)
 - [ ] Phase 5: reports, import/export, REST, CLI
 - [ ] Phase 6: hardening, tests, release prep
 
@@ -102,6 +102,12 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Add-on pricing without EPO Pro: BOM-line surcharges (§5.10 extended)
+
+the developer asked whether we're locked out of add-on price increases without paid EPO. **No — three routes**, documented in §5.10: (1) money-choices as variation attributes (current rule, native pricing, works today); (2) EPO Pro ~$39/yr (its real exclusive value: live price preview on the product page); (3) **BOM-line surcharges — the chosen build**: an optional `surcharge` on a conditional BOM line makes one row mean "consumes this component AND costs $X more"; the same cart-time line resolution Phase 4.5 does for weight also sets price = base + Σ(matched surcharges). Stacks identically to weight, plugin-agnostic, and pure-service fees model as hidden unmanaged-stock "labor" component lines (better bookkeeping than invisible fees). **Guard rule: a choice prices through EITHER its variation OR a surcharge, never both** — editor should warn. Known v1 limitation: no live product-page price preview; convention is "(+$5)" in option labels.
+
+**Schema shipped ahead of the feature** (established pattern): `wcbom_bom_items.surcharge DECIMAL(12,4) NULL`, DB_VERSION 0.4.0 — migration applied in env, all 7 existing BOM lines intact with NULL surcharge. Phase 4.5 (retitled "…& add-on surcharges", ~1 day) needs no migration.
 
 ### 2026-07-30 — Scope addition: shipping weight/dims/price for customizations (§5.10, Phase 4.5)
 
