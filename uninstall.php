@@ -25,6 +25,7 @@ function wcbom_run_uninstall(): void {
 			'wcbom_manufacture_orders',
 			'wcbom_bom_items',
 			'wcbom_boms',
+			'wcbom_ops',
 		) as $wcbom_table
 	) {
 		$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}{$wcbom_table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -32,6 +33,9 @@ function wcbom_run_uninstall(): void {
 
 	delete_option( 'wcbom_db_version' );
 	delete_option( 'wcbom_purge_data_on_uninstall' );
+	delete_option( 'wcbom_recommended_plugins_dismissed' );
+	delete_option( 'wcbom_low_stock_digest_enabled' );
+	delete_option( 'wcbom_low_stock_digest_email' );
 }
 
 wcbom_run_uninstall();

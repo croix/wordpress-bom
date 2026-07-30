@@ -124,7 +124,7 @@ The next `phpunit` run recreates all tables (`WC_Install::install()` + `Schema::
 - [x] Phase 4: manufacture orders (build/reverse) — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 4.5: BOM-derived shipping weight & add-on surcharges — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 5: reports, import/export, REST, CLI — **done and verified 2026-07-30, see Progress Log**
-- [ ] Phase 6: hardening, tests, release prep — **in progress**: UI/cosmetic pass done, PHPUnit suite covering full §9 checklist done, HPOS + blocks/shortcode checkout matrix done (real bug found and fixed — see Progress Log); remaining: uninstall data-policy re-verify, readme.txt + i18n/POT, §12 dependency version check-in
+- [ ] Phase 6: hardening, tests, release prep — **in progress**: UI/cosmetic pass, PHPUnit suite (full §9 checklist), HPOS + blocks/shortcode checkout matrix, and uninstall data-policy re-verify all done (two real bugs found and fixed along the way — see Progress Log); remaining: readme.txt + i18n/POT, §12 dependency version check-in
 
 Update this checklist as phases complete. Remaining open decisions are in BUILD_PLAN.md §11.
 
@@ -133,6 +133,12 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Phase 6: uninstall data-policy re-verified — `wcbom_ops` table was missing from the purge list
+
+Re-verifying `uninstall.php`'s keep-data-by-default / opt-in-purge policy (originally built and verified in the distribution/updates session) turned up a real gap: `wcbom_ops` (the idempotency-key table, added later than the other 5 tables during the crash-safety hardening work) was never added to `uninstall.php`'s drop list. A merchant opting into "Remove all data on uninstall" would have every other table dropped but this one silently left behind forever. Fixed by adding it to the drop list; also added cleanup for three options that were similarly never purged (`wcbom_recommended_plugins_dismissed`, `wcbom_low_stock_digest_enabled`, `wcbom_low_stock_digest_email`) — minor compared to a leftover table, but the setting's whole point is "remove all data," so these belong too.
+
+**Verified directly** (defining `WP_UNINSTALL_PLUGIN` and requiring `uninstall.php` in a `wp eval` context — equivalent proof for the data-policy logic itself, since the real "does WordPress actually invoke uninstall.php on plugin deletion" mechanism was already proven via a real zip-install + `wp plugin delete` in the earlier distribution session and hasn't changed): with the purge option left at its default ('no'), all 6 tables survive untouched (158 ledger rows intact). With the option set to 'yes', all 6 tables are dropped and all 5 options are deleted. Environment restored (`Schema::install()` + `wp wcbom seed --reset`), audit clean, debug.log empty.
 
 ### 2026-07-30 — Phase 6: HPOS + Blocks/shortcode checkout matrix — a real Blocks-checkout bug found and fixed
 
