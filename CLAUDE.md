@@ -150,6 +150,20 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
 
+### 2026-07-31 — Two developer-reported fixes: Ledger "null" reference, Component Usage rebuilt as a full table
+
+the developer went through the app post-Phase-10 and sent two notes.
+
+**Ledger "Reference" column showed literal "null" on cycle-count and manual-adjustment rows.** Root cause: `Rest\InventoryApi::apply()` (the shared path behind all three Inventory workflows) passes `ref_type = 'inventory_screen'` but `ref_id = null` — deliberately, per its own comment, since there's no order/MO entity for those to point at. The Ledger tab's reference cell built `` `${row.ref_type} #${row.ref_id}` `` gated only on `ref_type` being truthy, so a non-null ref_type with a null ref_id rendered as "inventory_screen #null" (JS template literals stringify `null` as the word). Fixed in `assets/src/reports/index.js` by nesting the check: show `ref_type #ref_id` only when both are present, otherwise just `ref_type` alone. Verified live: a real manual adjustment through the actual Inventory screen now shows "inventory_screen" cleanly, while rows with a real ref_id (e.g. `manufacture_order #1`) are unaffected.
+
+**Component Usage rebuilt from a mandatory single-component lookup into a full table.** The tab previously required picking exactly one component via the same autocomplete picker the BOM editor uses before showing anything. the developer wanted the opposite: every component listed at once (Item name, On hand, and the three usage numbers), with the search narrowing the already-visible list rather than gating it, and pagination past 10 rows.
+
+- New `Reports\ComponentUsageReport::generate()` — every `_wcbom_is_component` product's usage row, reusing the existing per-component `for_component()` internally (same 200-post ceiling as `Rest\InventoryApi::list_components()`, since this is an admin management screen, not a paginated public list). Kept `for_component()` and its singular `/reports/usage/{id}` REST route as-is — still a legitimate standalone lookup for anything scripting against the REST API directly, per BUILD_PLAN §5.9's own "future dashboards" rationale — and added the new list as a sibling `GET /reports/usage` route rather than replacing it.
+- Rewrote `UsageTab` in `assets/src/reports/index.js`: fetches the full list once via the existing `useReport()` hook (the same one every other report tab already uses), then a plain `TextControl` filters client-side by name, and a `LedgerTab`-style pager (client-side, not server-paginated, since ~200 rows fits comfortably in memory) shows 10 rows per page. Removed the now-unused `ComponentPicker` import.
+- New `tests/ComponentUsageReportTest.php` (2 tests): every flagged component appears with correct fields and a non-component product never does; a real order's consumption is reflected (stock decrements, `consumed_30d` matches, `used_in` populated). Full suite now 53 tests (was 51), all passing across repeated runs; PHPCS (64 files, `phpcbf`-fixed one alignment warning in `EndpointsPage`) and PHPStan level 6 both clean.
+
+**Verified live**: a real manual adjustment through Inventory produced a clean ledger row (no "#null"); the Reports → Component Usage tab now lists all 10 seeded components with On hand/30d/90d/days-of-stock in one table, no pagination controls shown at exactly 10 rows (correctly not needed), and typing "glitter" into the search narrowed it to the 2 matching rows live. `wp wcbom audit` clean, `debug.log` empty throughout.
+
 ### 2026-07-31 — Phase 10 complete: nested BOMs / sub-assemblies, two save-time guards, real cosmetic bug found and fixed
 
 Per BUILD_PLAN.md §5.14 — mostly validation, since consumption/invalidation for a manufactured sub-assembly already worked correctly (verified with new tests rather than assumed).

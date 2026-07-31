@@ -52,6 +52,7 @@ final class EndpointsPage {
 			'/wcbom/v1/reports/buildable'              => __( 'Buildable-stock report: every made-to-order product\'s bottleneck.', 'wcbom' ),
 			'/wcbom/v1/reports/low-stock'              => __( 'Components at/below their low-stock threshold, and what they block.', 'wcbom' ),
 			'/wcbom/v1/reports/margin'                 => __( 'BOM-derived cost vs. price per finished good/variation.', 'wcbom' ),
+			'/wcbom/v1/reports/usage'                  => __( 'Usage/run-rate report for every component.', 'wcbom' ),
 			'/wcbom/v1/reports/usage/(?P<component_id>\d+)' => __( 'Usage/run-rate report for one component.', 'wcbom' ),
 			'/wcbom/v1/ledger'                         => __( 'Filtered, paginated stock-ledger rows.', 'wcbom' ),
 		);

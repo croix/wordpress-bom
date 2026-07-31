@@ -6,12 +6,11 @@ import {
 	SelectControl,
 	Spinner,
 	TabPanel,
+	TextControl,
 } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import { addQueryArgs } from '@wordpress/url';
 import { __ } from '@wordpress/i18n';
-
-import ComponentPicker from '../bom-editor/component-picker';
 
 function formatNumber( n ) {
 	if ( null === n || undefined === n ) {
@@ -140,66 +139,92 @@ function MarginTab( { restNamespace } ) {
 }
 
 function UsageTab( { restNamespace } ) {
-	const [ component, setComponent ] = useState( null );
-	const [ usage, setUsage ] = useState( null );
-	const [ loading, setLoading ] = useState( false );
-	const [ error, setError ] = useState( null );
+	const { rows, loading, error } = useReport( restNamespace, '/reports/usage' );
+	const [ search, setSearch ] = useState( '' );
+	const [ page, setPage ] = useState( 1 );
+	const perPage = 10;
 
-	useEffect( () => {
-		if ( ! component ) {
-			setUsage( null );
-			return;
-		}
-		setLoading( true );
-		setError( null );
-		apiFetch( { path: `/${ restNamespace }/reports/usage/${ component.id }` } )
-			.then( setUsage )
-			.catch( ( err ) => setError( err.message || String( err ) ) )
-			.finally( () => setLoading( false ) );
-	}, [ restNamespace, component ] );
+	if ( loading ) {
+		return <Spinner />;
+	}
+	if ( error ) {
+		return (
+			<Notice status="error" isDismissible={ false }>
+				{ error }
+			</Notice>
+		);
+	}
+
+	const filtered = rows.filter( ( row ) =>
+		row.name.toLowerCase().includes( search.toLowerCase() )
+	);
+	const totalPages = Math.max( 1, Math.ceil( filtered.length / perPage ) );
+	const page_ = Math.min( page, totalPages );
+	const visible = filtered.slice( ( page_ - 1 ) * perPage, page_ * perPage );
 
 	return (
 		<>
-			<ComponentPicker
-				restNamespace={ restNamespace }
-				value={ component }
-				onSelect={ setComponent }
-				onClear={ () => setComponent( null ) }
+			<TextControl
+				label={ __( 'Search components', 'wcbom' ) }
+				value={ search }
+				onChange={ ( value ) => {
+					setSearch( value );
+					setPage( 1 );
+				} }
+				__next40pxDefaultSize
+				__nextHasNoMarginBottom
 			/>
 
-			{ loading && <Spinner /> }
-			{ error && (
-				<Notice status="error" isDismissible={ false }>
-					{ error }
-				</Notice>
+			{ 0 === rows.length && <p>{ __( 'No components yet.', 'wcbom' ) }</p> }
+			{ rows.length > 0 && 0 === filtered.length && (
+				<p>{ __( 'No components match your search.', 'wcbom' ) }</p>
 			) }
 
-			{ usage && (
-				<Card style={ { marginTop: '1em' } }>
-					<CardBody>
-						<p>
-							{ __( 'On hand:', 'wcbom' ) } <strong>{ formatNumber( usage.stock ) }</strong>
-							{ ' — ' }
-							{ __( 'consumed last 30 days:', 'wcbom' ) } <strong>{ formatNumber( usage.consumed_30d ) }</strong>
-							{ ' — ' }
-							{ __( 'consumed last 90 days:', 'wcbom' ) } <strong>{ formatNumber( usage.consumed_90d ) }</strong>
-							{ ' — ' }
-							{ __( 'days of stock left:', 'wcbom' ) }{ ' ' }
-							<strong>{ null === usage.days_of_stock ? __( 'n/a (no recent consumption)', 'wcbom' ) : usage.days_of_stock }</strong>
-						</p>
+			{ filtered.length > 0 && (
+				<>
+					<table className="widefat striped" style={ { marginTop: '1em' } }>
+						<thead>
+							<tr>
+								<th>{ __( 'Item name', 'wcbom' ) }</th>
+								<th>{ __( 'On hand', 'wcbom' ) }</th>
+								<th>{ __( 'Consumed (30d)', 'wcbom' ) }</th>
+								<th>{ __( 'Consumed (90d)', 'wcbom' ) }</th>
+								<th>{ __( 'Days of stock', 'wcbom' ) }</th>
+							</tr>
+						</thead>
+						<tbody>
+							{ visible.map( ( row ) => (
+								<tr key={ row.component_id }>
+									<td>{ row.name }</td>
+									<td>{ formatNumber( row.stock ) }</td>
+									<td>{ formatNumber( row.consumed_30d ) }</td>
+									<td>{ formatNumber( row.consumed_90d ) }</td>
+									<td>{ null === row.days_of_stock ? __( 'n/a', 'wcbom' ) : row.days_of_stock }</td>
+								</tr>
+							) ) }
+						</tbody>
+					</table>
 
-						<h3>{ __( 'Used in', 'wcbom' ) }</h3>
-						{ 0 === usage.used_in.length ? (
-							<p>{ __( 'Not used in any active BOM.', 'wcbom' ) }</p>
-						) : (
-							<ul>
-								{ usage.used_in.map( ( item ) => (
-									<li key={ item.product_id }>{ item.name }</li>
-								) ) }
-							</ul>
-						) }
-					</CardBody>
-				</Card>
+					{ totalPages > 1 && (
+						<p>
+							<button
+								className="button"
+								disabled={ page_ <= 1 }
+								onClick={ () => setPage( ( p ) => p - 1 ) }
+							>
+								{ __( '‹ Previous', 'wcbom' ) }
+							</button>{ ' ' }
+							{ __( 'Page', 'wcbom' ) } { page_ } { __( 'of', 'wcbom' ) } { totalPages }{ ' ' }
+							<button
+								className="button"
+								disabled={ page_ >= totalPages }
+								onClick={ () => setPage( ( p ) => p + 1 ) }
+							>
+								{ __( 'Next ›', 'wcbom' ) }
+							</button>
+						</p>
+					) }
+				</>
 			) }
 		</>
 	);
@@ -293,7 +318,7 @@ function LedgerTab( { restNamespace, ledgerExportUrl } ) {
 									<td>{ formatNumber( row.delta ) }</td>
 									<td>{ formatNumber( row.stock_after ) }</td>
 									<td>{ row.reason }</td>
-									<td>{ row.ref_type ? `${ row.ref_type } #${ row.ref_id }` : '—' }</td>
+									<td>{ row.ref_type ? ( row.ref_id ? `${ row.ref_type } #${ row.ref_id }` : row.ref_type ) : '—' }</td>
 									<td>{ row.note || '—' }</td>
 								</tr>
 							) ) }

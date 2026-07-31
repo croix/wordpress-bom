@@ -80,6 +80,16 @@ final class ReportsApi {
 
 		register_rest_route(
 			self::NAMESPACE,
+			'/reports/usage',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'get_usage_all' ),
+				'permission_callback' => array( $this, 'can_manage' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
 			'/reports/usage/(?P<component_id>\d+)',
 			array(
 				'methods'             => WP_REST_Server::READABLE,
@@ -115,6 +125,14 @@ final class ReportsApi {
 	 */
 	public function get_margin(): WP_REST_Response {
 		return new WP_REST_Response( array( 'rows' => $this->margin->generate() ) );
+	}
+
+	/**
+	 * GET /reports/usage — every component's usage row, for the Reports
+	 * screen's list-everything table.
+	 */
+	public function get_usage_all(): WP_REST_Response {
+		return new WP_REST_Response( array( 'rows' => $this->usage->generate() ) );
 	}
 
 	/**

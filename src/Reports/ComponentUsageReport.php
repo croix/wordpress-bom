@@ -37,6 +37,43 @@ final class ComponentUsageReport {
 	) {}
 
 	/**
+	 * Usage data for every product flagged as a component — the Reports
+	 * screen's "Component Usage" table. Same 200-post ceiling as
+	 * Rest\InventoryApi::list_components() (an admin management screen,
+	 * not a paginated frontend list); the React table paginates client-side
+	 * on top of that.
+	 *
+	 * @return array<int,array{component_id:int,name:string,stock:float,used_in:array<int,array{product_id:int,name:string}>,consumed_30d:float,consumed_90d:float,days_of_stock:float|null}>
+	 */
+	public function generate(): array {
+		$query = new \WP_Query(
+			array(
+				'post_type'      => 'product',
+				'post_status'    => array( 'publish', 'private', 'draft' ),
+				'posts_per_page' => 200, // phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page -- admin management screen, matching Rest\InventoryApi::list_components().
+				'orderby'        => 'title',
+				'order'          => 'ASC',
+				'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					array(
+						'key'   => '_wcbom_is_component',
+						'value' => 'yes',
+					),
+				),
+			)
+		);
+
+		$rows = array();
+		foreach ( $query->posts as $post ) {
+			$row = $this->for_component( (int) $post->ID );
+			if ( null !== $row ) {
+				$rows[] = $row;
+			}
+		}
+
+		return $rows;
+	}
+
+	/**
 	 * Usage data for one component.
 	 *
 	 * @param int $component_id Component product/variation ID.
