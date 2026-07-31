@@ -196,7 +196,7 @@ function UsageTab( { restNamespace } ) {
 							{ visible.map( ( row ) => (
 								<tr key={ row.component_id }>
 									<td>{ row.name }</td>
-									<td>{ formatNumber( row.stock ) }</td>
+									<td>{ formatNumber( row.stock ) } { row.unit }</td>
 									<td>{ formatNumber( row.consumed_30d ) }</td>
 									<td>{ formatNumber( row.consumed_90d ) }</td>
 									<td>{ null === row.days_of_stock ? __( 'n/a', 'wcbom' ) : row.days_of_stock }</td>

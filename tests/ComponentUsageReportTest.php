@@ -35,9 +35,13 @@ final class ComponentUsageReportTest extends WCBOM_UnitTestCase {
 
 		$blank_row = current( array_filter( $rows, static fn( $row ): bool => $row['component_id'] === $blank ) );
 		$this->assertSame( 'Usage Report Blank', $blank_row['name'] );
+		$this->assertSame( 'ea', $blank_row['unit'], 'Unit defaults to "ea" when none was set.' );
 		$this->assertSame( 100.0, $blank_row['stock'] );
 		$this->assertSame( 0.0, $blank_row['consumed_30d'], 'No orders/MOs consumed it yet.' );
 		$this->assertNull( $blank_row['days_of_stock'], 'No recent consumption means the run-rate estimate is undefined.' );
+
+		$glitter_row = current( array_filter( $rows, static fn( $row ): bool => $row['component_id'] === $glitter ) );
+		$this->assertSame( 'g', $glitter_row['unit'] );
 	}
 
 	public function test_generate_reflects_real_consumption(): void {

@@ -43,7 +43,7 @@ final class ComponentUsageReport {
 	 * not a paginated frontend list); the React table paginates client-side
 	 * on top of that.
 	 *
-	 * @return array<int,array{component_id:int,name:string,stock:float,used_in:array<int,array{product_id:int,name:string}>,consumed_30d:float,consumed_90d:float,days_of_stock:float|null}>
+	 * @return array<int,array{component_id:int,name:string,unit:string,stock:float,used_in:array<int,array{product_id:int,name:string}>,consumed_30d:float,consumed_90d:float,days_of_stock:float|null}>
 	 */
 	public function generate(): array {
 		$query = new \WP_Query(
@@ -77,7 +77,7 @@ final class ComponentUsageReport {
 	 * Usage data for one component.
 	 *
 	 * @param int $component_id Component product/variation ID.
-	 * @return array{component_id:int,name:string,stock:float,used_in:array<int,array{product_id:int,name:string}>,consumed_30d:float,consumed_90d:float,days_of_stock:float|null}|null
+	 * @return array{component_id:int,name:string,unit:string,stock:float,used_in:array<int,array{product_id:int,name:string}>,consumed_30d:float,consumed_90d:float,days_of_stock:float|null}|null
 	 */
 	public function for_component( int $component_id ): ?array {
 		$component = wc_get_product( $component_id );
@@ -87,10 +87,12 @@ final class ComponentUsageReport {
 
 		$consumed_30d = $this->ledger->consumed_since( $component_id, self::CONSUMPTION_REASONS, 30 );
 		$stock        = (float) $component->get_stock_quantity();
+		$unit         = get_post_meta( $component_id, '_wcbom_unit', true );
 
 		return array(
 			'component_id'  => $component_id,
 			'name'          => $component->get_name(),
+			'unit'          => '' !== $unit ? (string) $unit : 'ea',
 			'stock'         => $stock,
 			'used_in'       => $this->boms->used_in( $component_id ),
 			'consumed_30d'  => $consumed_30d,

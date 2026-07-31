@@ -150,6 +150,10 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
 
+### 2026-07-31 — Component Usage table gains unit of measure
+
+the developer asked to add the unit (grams, pieces, etc.) to the newly-rebuilt Component Usage table. `ComponentUsageReport::for_component()` now reads `_wcbom_unit` the same way `Rest\InventoryApi::list_components()` already does (default `'ea'` when unset), and the React table shows it appended to "On hand" (`84 ea`, `425 g`) — matching the exact convention the Component Inventory screen already uses, rather than a separate column. `tests/ComponentUsageReportTest.php` gained assertions for both the default and an explicit unit. Full suite now 53 tests, all passing; PHPCS/PHPStan clean. Verified live: the table shows "84 ea", "175 ml", "425 g" etc. correctly for the seeded catalog.
+
 ### 2026-07-31 — Two developer-reported fixes: Ledger "null" reference, Component Usage rebuilt as a full table
 
 the developer went through the app post-Phase-10 and sent two notes.
