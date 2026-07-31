@@ -433,7 +433,7 @@ A new **`Admin\GuidePage`** ("BOM & Stock → Guide"), rendered in plain PHP —
 
 **Content model: PHP files returning structured arrays**, one section per entry: `id`, `title`, `body` (HTML), `screenshots` (path + alt text), `links`, optional `video`. Deliberately **not** Markdown files: a parser would be the plugin's first runtime dependency beyond the autoloader, and Markdown content can't pass through `__()`, which would make the entire training module untranslatable right after we got a clean POT (see the i18n Progress Log entry). Long-form prose inside `__()` is slightly awkward for translators, but it's standard WordPress practice and keeps the text domain honest.
 
-**Also add WordPress-native contextual help tabs** (`get_current_screen()->add_help_tab()`) on each of the five plugin screens: two or three sentences plus a deep link into the matching Guide section. Cheap, native, needs no screenshots, and it appears exactly where a confused user looks first — complementing the full guide rather than duplicating it.
+**Also add WordPress-native contextual help tabs** (`get_current_screen()->add_help_tab()`) on each plugin screen — the five core ones plus Purchasing (§5.13) when the vendors feature is enabled: two or three sentences plus a deep link into the matching Guide section. Cheap, native, needs no screenshots, and it appears exactly where a confused user looks first — complementing the full guide rather than duplicating it.
 
 #### Screenshots: generated, never hand-captured
 
@@ -444,7 +444,9 @@ Spec: a dev-only generator script (`bin/capture-docs-screenshots.mjs`, driven by
 Requirements that make the output stable and reviewable:
 
 - **Run against a freshly reset fixture** (`wp wcbom seed --reset`) at a **fixed viewport** (1440×900). Without determinism, every regeneration produces churn from shifting product IDs and stock numbers, and the diffs become unreviewable.
-- **Downscale to ~1200px wide and optimize**; note that these assets add real weight to a currently-tiny release zip, so keep the set tight (roughly 15–20 images, one per meaningful screen/state, not one per click).
+- **Run with the §5.13 vendors & purchase orders feature turned ON** (a step the script itself must do — `wp option update wcbom_vendors_enabled yes` — before capturing, then nothing to undo since the seeder never creates sample vendors/POs anyway). Off by default, the Purchasing screens and every Settings/Inventory/report cell they surface on would otherwise never get captured.
+- **Strip unrelated admin notices before every capture (added 2026-07-31, caught live — the dev environment's WP Mail SMTP and Action Scheduler notices show up in every screen right now).** Any third-party plugin active in whatever environment happens to run the generator can inject its own banner ("N past-due actions found", "emails recently failed to send", WooCommerce's own "Store coming soon" bar, etc.) — none of which belong in *this* plugin's documentation and all of which would make screenshots look like something's wrong. Before each screenshot, the script runs a small injected script/stylesheet that removes everything matching `#wpbody-content .notice, #wpbody-content .updated, #wpbody-content .error, #wpadminbar #wp-admin-bar-woocommerce-site-visibility` (the WooCommerce "Store coming soon" toolbar item) — a blanket strip, not an allowlist of known-offending plugins, since the point is robustness against whatever happens to be installed in the capture environment, not against today's specific two. Our own React admin notices (success/error states inside the BOM editor, Inventory, etc.) are captured deliberately and separately as their own documented states, not swept up by this — the strip targets the generic wp-admin notice chrome, not our app's own UI.
+- **Downscale to ~1200px wide and optimize**; note that these assets add real weight to a currently-tiny release zip, so keep the set tight. **Re-estimated 2026-07-31** (was 15–20): with Purchasing (PO list, vendor list, new-PO/receive/costs/send modals), the BOM tab's two new toggles (weight-from-BOM, COGS-from-BOM) and sub-assembly guidance, and the Settings page's two new checkboxes all needing coverage, **roughly 25–30 images** — still one per meaningful screen/state, not one per click.
 - **`bin/build-release-zip.sh` must add `assets/docs` to its shipped file list** — exactly the gap `readme.txt` had until Phase 6.
 - **Every screenshot needs alt text**, wrapped in `__()` like the rest of the content.
 - Screenshots come from the local fixture, so they show only our own original sample catalog (GPL, per the sample-data Progress Log entry) — no real store data, no credentials.
@@ -460,29 +462,34 @@ the developer's "build docs last" rule is right, but it only prevents omission *
 
 #### Content outline (the full user-facing surface, so nothing is missed)
 
+**Updated 2026-07-31** to fold in everything spec'd/built after this section was first written (§5.11 COGS, §5.13 vendors & POs, §5.14 nested BOMs, and the §11 negative-stock/digest settings) — the outline below is the current, complete one; don't build against the original 13-item version still visible in git history.
+
 1. **Orientation** — the core mental model: components are products; BOMs are recipes; the three product modes (`standard` / `made_to_order` / `manufactured`); every stock change is ledgered.
 2. **First-run setup** — install/remove sample data, flagging a product as a component, choosing units (and why bulk materials are stocked in grams, §5.6).
-3. **Building a BOM** — the product BOM tab: lines, always vs. attribute vs. add-on conditions, surcharge, the weight-from-BOM toggle, and why saving creates a new version.
+3. **Building a BOM** — the product BOM tab: lines, always vs. attribute vs. add-on conditions, surcharge, the weight-from-BOM toggle, why saving creates a new version, and — **new (§5.11, §5.14)** — the "Cost of Goods Sold from BOM" toggle (what it feeds, why the product's own Cost field still looks empty by design) and using a manufactured product as a sub-assembly component in another BOM (why made-to-order products can't be used this way, and what the cycle-detection error means if it's ever seen).
 4. **Selling made-to-order** — buildable ("phantom") stock, per-option add-to-cart blocking, what consumption writes, and how cancel/refund restore work from the snapshot.
-5. **Component Inventory** — receive vs. cycle count vs. adjust, and when to use each.
-6. **Manufacturing** — draft → complete → reverse, partial reversal, scrap, and new-product-from-template.
-7. **Reports** — all five tabs (Buildable, Low Stock, Margin, Component Usage, Ledger).
-8. **CSV import/export** — SKU-keyed, full-replace-per-parent semantics.
-9. **Settings** — uninstall data policy, low-stock digest.
-10. **For developers** — REST endpoints, WP-CLI commands, the Endpoints page.
-11. **Companion plugins** — EPO and swatches setup; **the only place third-party video links belong.**
-12. **Troubleshooting & recovery** — `wp wcbom audit`, oversell/shortage order flags, stock drift.
-13. **What this plugin deliberately doesn't do** — no supplier PO tracking, no dimension stacking (§5.10), no live product-page price preview. Setting expectations up front is training, and it prevents support questions about absent features.
+5. **Component Inventory** — receive vs. cycle count vs. adjust, and when to use each; **new (§5.13)** — the "On order" column that appears once vendors & purchase orders is turned on.
+6. **Manufacturing** — draft → complete → reverse, partial reversal, scrap, and new-product-from-template; a sub-assembly built here (§5.14) can be used as a component in another product's BOM exactly like any raw material.
+7. **Vendors & Purchase Orders** *(new section, §5.13)* — **opt-in and off by default**, stated up front so a merchant who doesn't need this can skip the section entirely: how to turn it on (Settings), what changes when it's on (a new Purchasing menu item, an On order column elsewhere) and what doesn't (nothing, when it's off), the vendor list, the PO lifecycle (draft → ordered → partially received/received, or cancelled — including that "Cancel" relabels itself to "Close" once anything's been received, and why that's the same action), editing freight/tax/fees and reading the amortized landed cost, and sending a PO by email (recipients always come from records on file, never a typed address).
+8. **Reports** — all five tabs (Buildable, Low Stock, Margin, Component Usage, Ledger); note that Low Stock's on-order figures only appear once Vendors & POs is enabled, and that turning on the BOM tab's COGS toggle is what feeds WooCommerce's *own* native Analytics — this screen isn't the only place that cost number ends up.
+9. **CSV import/export** — SKU-keyed, full-replace-per-parent semantics; a row naming a made-to-order product as a component, or one that would create a BOM cycle, is skipped with a clear reason rather than aborting the whole import (§5.14).
+10. **Settings** — uninstall data policy, low-stock digest, **new (§11, §5.13)** — "Allow negative component stock" (what it governs and what it deliberately doesn't — paid-order consumption is never blocked by it) and "Enable vendors & purchase orders."
+11. **For developers** — REST endpoints, WP-CLI commands, the Endpoints page (already reads every route live, so this section can describe the *shape* of the API rather than an enumerable list that would drift).
+12. **Companion plugins** — EPO and swatches setup; **the only place third-party video links belong.**
+13. **Troubleshooting & recovery** — `wp wcbom audit`, oversell/shortage order flags, stock drift.
+14. **What this plugin deliberately doesn't do** — **updated 2026-07-31: supplier PO tracking moved out of this list since §5.13 built it.** Still true and worth stating: no dimension stacking (§5.10 — variation-level dimensions only), no live product-page price preview (surcharges show as a static "(+$5)" label, not a running total as options are picked), no "buildable-through" for nested sub-assemblies (§5.14 — buildable reflects a sub-assembly's on-hand stock, not what could theoretically be built from its own raw materials), no multi-warehouse/location stock, barcode scanning, or serial/lot tracking. Setting expectations up front is training, and it prevents support questions about absent features.
 
 #### Acceptance criteria
 
 - A new user can go from a fresh install to a working made-to-order product, a completed manufacture order, and a stock receipt using the Guide alone, without asking a question.
+- A merchant who wants to track vendors and purchase orders can find, enable, and use that section from the Guide alone — and a merchant who doesn't can read the whole Guide without ever being told to turn on something they don't need.
 - `npm run docs:screenshots` regenerates every image against a reset fixture, and re-running it twice with no code change produces **no git diff** (proof the fixture and viewport really are deterministic).
+- **No screenshot shows a WordPress/third-party admin notice** — no "past-due actions," no "email failed to send," no plugin-update nag, nothing from anything other than this plugin's own UI (added 2026-07-31, caught live during this session — the dev environment had exactly this kind of noise visible in every admin screenshot).
 - The coverage test fails if a page/route/command is added without a doc section.
-- Contextual help tabs appear on all five plugin screens.
+- Contextual help tabs appear on all five core screens plus Purchasing when enabled.
 - No external resource loads on the Guide page unless the user clicks a video (verify with the browser network panel — this is the privacy claim, so it gets tested, not assumed).
 
-**Estimate: ~2–3 days**, most of it writing content rather than code (screenshot tooling and the coverage test are maybe half a day combined). **Ordering: Phase 8, after Phase 7 (COGS, §5.11)** — and if anything further gets spec'd before this is built, docs move again behind it. That's precisely what the standing rule is for.
+**Estimate: ~3–4 days** (re-estimated 2026-07-31, up from ~2–3 — more admin surface to cover since this was first written: Vendors & POs, the COGS toggle, nested-BOM guidance), most of it writing content rather than code (screenshot tooling and the coverage test are maybe half a day combined). **Ordering: Phase 8, built last.** As of 2026-07-31 that means after Phases 7, 9, and 10 (COGS, vendors & POs, nested BOMs) — if anything further gets spec'd before this is built, docs move again behind it. That's precisely what the standing rule is for.
 
 ---
 
@@ -666,10 +673,10 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 - Per §5.11: `Integrations\CogsProvider` hooking `woocommerce_get_product_cogs_total_value`; `_wcbom_cogs_from_bom` opt-in toggle on the BOM tab; extract the Σ(component price × qty) calculation out of `MarginReport` into something shared so our margin report and WooCommerce Analytics can never disagree; `MANUFACTURED` products source cost from their latest completed MO snapshot, made-to-order from the live per-variation BOM.
 - ✅ Demo: enable WooCommerce's Cost of Goods Sold feature, place an order for a made-to-order variation, and see WooCommerce's **own** Analytics report the correct BOM-derived profit — with two different variations correctly reporting different costs, and the whole integration inert when either toggle is off.
 
-### Phase 8 — In-app documentation & training module (~2–3 days, added 2026-07-30) — **must be built LAST**
-- Per §5.12: `Admin\GuidePage` (plain PHP, structured-array content), WP-native contextual help tabs on all five screens, generated screenshots via a dev-only Playwright script (`npm run docs:screenshots`), a coverage test that fails when a page/route/CLI command has no doc section, and third-party companion-plugin videos **linked, never embedded**.
-- **Ordering rule (the developer's, 2026-07-30):** documentation is built last so nothing is created after it and left out of training. As of the 2026-07-30 scope additions, that means after Phases 9 and 10. The coverage test and screenshot script must run **with the §5.13 vendors feature enabled**, or the gated Purchasing surfaces would be invisible to both.
-- ✅ Demo: a new user follows the Guide alone from fresh install → working made-to-order product → completed manufacture order → stock receipt, with no questions; re-running the screenshot generator twice produces no git diff.
+### Phase 8 — In-app documentation & training module (~3–4 days, added 2026-07-30, re-estimated 2026-07-31) — **must be built LAST**
+- Per §5.12 (updated 2026-07-31 to cover everything added since it was first written — read the current version, not just this summary): `Admin\GuidePage` (plain PHP, structured-array content), WP-native contextual help tabs on all six screens (five core + Purchasing when enabled), generated screenshots via a dev-only Playwright script (`npm run docs:screenshots`) that runs with the vendors feature turned on and strips any third-party admin notice before every capture, a coverage test that fails when a page/route/CLI command has no doc section, and third-party companion-plugin videos **linked, never embedded**.
+- **Ordering rule (the developer's, 2026-07-30):** documentation is built last so nothing is created after it and left out of training. As of the 2026-07-30 scope additions, that means after Phases 7, 9, and 10. The coverage test and screenshot script must run **with the §5.13 vendors feature enabled**, or the gated Purchasing surfaces would be invisible to both.
+- ✅ Demo: a new user follows the Guide alone from fresh install → working made-to-order product → completed manufacture order → stock receipt, with no questions; a merchant can find, enable, and use Vendors & Purchase Orders from the Guide alone; re-running the screenshot generator twice produces no git diff, and no generated screenshot shows a WordPress/third-party admin notice.
 
 ### Phase 9 — Vendors & purchase orders, strictly opt-in (~2–3 days, added 2026-07-30) — ✅ **done and verified 2026-07-30, see CLAUDE.md Progress Log**
 - Per §5.13: three new tables (+ uninstall purge list), `VendorRepository`/`PurchaseOrderRepository`/`PurchaseOrderService`, receive-against-PO through StockService + OperationGuard (`po_receive` ledger reason), one gated "Purchasing" admin page (React; PO list + Vendors tabs), gated REST routes, on-order quantities in the low-stock report/digest/Inventory screen, one new audit check.
@@ -680,7 +687,7 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 - Per §5.14: cycle detection + made-to-order-component rejection in `BomRepository::save()`; tests proving consumption/invalidation/buildable behavior for manufactured components already works end-to-end; docs notes on shallow-buildable semantics and sub-assembly pricing.
 - ✅ Demo (verified): built a manufactured sub-assembly and used it as a made-to-order product's only always-line — buildable = floor(sub-assembly on-hand ÷ qty), refreshing correctly as the sub-assembly was built/reversed/consumed, while a raw material used only inside the sub-assembly's own recipe correctly did not move it; a self-referencing save, an indirect A→B→A cycle, and a made-to-order component were all rejected with clear messages through the real BOM editor UI, not just direct code calls.
 
-**Total estimate: ~13–18 focused build days** (plus ~half a day for Phase 7, ~2–3 days for Phase 9, ~1 day for Phase 10, and ~2–3 days for Phase 8, which ships last). Phases 1–4 are the core; 5–6 can trail while the store starts using it.
+**Total estimate: ~13–18 focused build days** (plus ~half a day for Phase 7, ~2–3 days for Phase 9, ~1 day for Phase 10, and ~3–4 days for Phase 8, which ships last). Phases 1–4 are the core; 5–6 can trail while the store starts using it.
 
 ---
 

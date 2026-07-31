@@ -140,7 +140,7 @@ The next `phpunit` run recreates all tables (`WC_Install::install()` + `Schema::
 - [x] §11 closeout: negative-stock setting + phantom-display-format resolution — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 9: vendors & purchase orders, strictly opt-in — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 10: nested BOMs / sub-assemblies — **done and verified 2026-07-31, see Progress Log**
-- [ ] Phase 8: in-app documentation & training module — **spec'd 2026-07-30 (BUILD_PLAN §5.12), not yet built** (~2–3 days). **Must be built LAST** (the developer's ordering rule) so nothing is created after it and left out of training — this is now the only phase left. Its coverage test/screenshot script must run with the §5.13 vendors feature ON.
+- [ ] Phase 8: in-app documentation & training module — **spec'd 2026-07-30, updated 2026-07-31 (BUILD_PLAN §5.12), not yet built** (~3–4 days, re-estimated). **Must be built LAST** (the developer's ordering rule) so nothing is created after it and left out of training — this is now the only phase left. Its coverage test/screenshot script must run with the §5.13 vendors feature ON, and must strip third-party admin notices before every capture.
 
 Update this checklist as phases complete. Remaining open decisions are in BUILD_PLAN.md §11.
 
@@ -149,6 +149,16 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-31 — Phase 8 spec (§5.12) updated for everything added since it was written
+
+the developer asked to update the documentation-module spec to cover the features added after it was first written on 2026-07-30 (COGS integration, vendors & purchase orders, nested BOMs) before Phase 8 actually starts. Nothing built yet — spec-only.
+
+**Content outline revised** (BUILD_PLAN §5.12): the "Building a BOM" section now covers the COGS-from-BOM toggle and using a manufactured product as a sub-assembly component; a new standalone "Vendors & Purchase Orders" section is added (explicitly opening with "opt-in and off by default" so a merchant who doesn't need it can skip it entirely) covering enabling the feature, the vendor list, the full PO lifecycle including the Cancel→Close relabeling, landed cost, and emailing a PO; Reports and Settings sections gained notes for the on-order column and the new toggles; CSV import/export gained a note that a made-to-order-component or cycle-creating row is skipped with a clear reason, not an aborted import. **"What this plugin deliberately doesn't do" had supplier PO tracking removed** — the exact thing that section used to list as an exclusion is now a real, built feature, and leaving it in would have been actively wrong. Added "buildable-through" for nested sub-assemblies to that list instead (a real, current limitation, per §5.14).
+
+**Also folded in mid-session, from watching the live app while making these edits:** the dev environment's WP Mail SMTP and Action Scheduler admin notices are visible in every wp-admin screenshot right now. Added a hard requirement that the screenshot generator strip any third-party admin notice before every capture (a blanket selector removing `#wpbody-content .notice`/`.updated`/`.error` and the WooCommerce "Store coming soon" toolbar item — not an allowlist of today's two offending plugins, since the point is robustness against whatever's installed in whatever environment ends up running the generator) and added "no screenshot shows a WP/third-party admin notice" as its own acceptance criterion.
+
+**Re-estimated Phase 8 from ~2–3 days to ~3–4 days** given the added admin surface (Purchasing's several screens/modals, two new BOM-tab toggles, two new Settings checkboxes) and bumped the expected screenshot count from ~15–20 to ~25–30 accordingly. BUILD_PLAN §8's Phase 8 entry and this file's Status checklist updated to match.
 
 ### 2026-07-31 — Component Usage table gains unit of measure
 
