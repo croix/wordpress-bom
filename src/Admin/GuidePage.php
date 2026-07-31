@@ -145,8 +145,14 @@ final class GuidePage {
 			return;
 		}
 
+		// A cache-busting ?ver= (like every other enqueued asset in this
+		// plugin) so a regenerated screenshot is never served stale from
+		// the browser's cache — plain <img> tags have no other mechanism
+		// forcing a refetch when the file changes but the URL doesn't.
+		$src = add_query_arg( 'ver', (string) filemtime( $path ), plugins_url( 'assets/docs/' . $block['file'], WCBOM_PLUGIN_FILE ) );
+
 		echo '<img class="wcbom-guide-screenshot" loading="lazy" src="'
-			. esc_url( plugins_url( 'assets/docs/' . $block['file'], WCBOM_PLUGIN_FILE ) )
+			. esc_url( $src )
 			. '" alt="' . esc_attr( $block['alt'] ) . '" />';
 	}
 
