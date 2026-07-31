@@ -98,6 +98,37 @@ final class ManufactureRepository {
 	}
 
 	/**
+	 * The most recently completed manufacture order for a product, or null
+	 * if it's never been built — Integrations\CogsProvider's cost source
+	 * for MANUFACTURED products (what the units in stock actually cost to
+	 * build, via the completed MO's snapshot unit costs, rather than
+	 * today's live component prices). Includes 'partially_reversed' as well
+	 * as 'completed': a partial reversal changes remaining quantity, not the
+	 * cost basis of the units still in stock from that same build, so
+	 * excluding it would wrongly skip to an older MO (or the live-cost
+	 * fallback) the moment any single unit from the latest batch is
+	 * reversed. Excludes fully 'reversed' MOs deliberately — none of that
+	 * batch's units remain in stock, so its cost no longer describes
+	 * anything physically on the shelf.
+	 *
+	 * @param int $product_id The finished good.
+	 */
+	public function latest_completed_for_product( int $product_id ): ?ManufactureOrder {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- built via $wpdb->prepare().
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}wcbom_manufacture_orders WHERE product_id = %d AND status IN ('completed','partially_reversed') ORDER BY mo_id DESC LIMIT 1",
+				$product_id
+			),
+			ARRAY_A
+		);
+
+		return null !== $row ? $this->hydrate( $row ) : null;
+	}
+
+	/**
 	 * Writes the consumption snapshot for a completed manufacture order.
 	 *
 	 * @param int                                                                                        $mo_id The manufacture order's ID.

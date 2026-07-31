@@ -10,7 +10,12 @@ declare(strict_types=1);
 namespace WCBOM\Admin;
 
 use WC_Product;
+use WCBOM\Bom\Bom;
 use WCBOM\Bom\BomRepository;
+use WCBOM\Bom\ConditionMatcher;
+use WCBOM\Bom\ProductMode;
+use WCBOM\Manufacture\ManufactureRepository;
+use WCBOM\Reports\BomCost;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -24,9 +29,17 @@ final class ProductBomMetabox {
 	/**
 	 * Constructs the metabox.
 	 *
-	 * @param BomRepository $boms Used for the "used in N products" reverse view.
+	 * @param BomRepository         $boms      Used for the "used in N products" reverse view.
+	 * @param ConditionMatcher      $matcher   Resolves always-lines for the COGS cost hint.
+	 * @param BomCost               $cost      Shared Σ(component price × qty) calculation.
+	 * @param ManufactureRepository $mo_orders Latest completed MO lookup, for the MANUFACTURED cost hint.
 	 */
-	public function __construct( private readonly BomRepository $boms ) {}
+	public function __construct(
+		private readonly BomRepository $boms,
+		private readonly ConditionMatcher $matcher,
+		private readonly BomCost $cost,
+		private readonly ManufactureRepository $mo_orders
+	) {}
 
 	/**
 	 * Hooks all product-data-panel and enqueue callbacks.
@@ -69,6 +82,7 @@ final class ProductBomMetabox {
 		$unit_meta       = get_post_meta( $product_id, '_wcbom_unit', true );
 		$unit            = '' !== $unit_meta ? $unit_meta : 'ea';
 		$weight_from_bom = 'yes' === get_post_meta( $product_id, '_wcbom_weight_from_bom', true );
+		$cogs_from_bom   = 'yes' === get_post_meta( $product_id, '_wcbom_cogs_from_bom', true );
 
 		echo '<div id="wcbom_bom_data" class="panel woocommerce_options_panel">';
 		echo '<div class="options_group">';
@@ -119,6 +133,17 @@ final class ProductBomMetabox {
 			)
 		);
 
+		woocommerce_wp_checkbox(
+			array(
+				'id'          => '_wcbom_cogs_from_bom',
+				'label'       => __( 'Cost of Goods Sold from BOM', 'wcbom' ),
+				'description' => __( 'When WooCommerce\'s Cost of Goods Sold feature is enabled, report this product\'s BOM cost instead of the (empty, unless typed) Cost field below on the Advanced tab. Leave unchecked if you\'d rather type a cost by hand — for example to include overhead this plugin doesn\'t model.', 'wcbom' ),
+				'value'       => $cogs_from_bom ? 'yes' : 'no',
+			)
+		);
+
+		$this->render_cogs_hint( $product_id );
+
 		echo '</div>';
 
 		if ( $is_component ) {
@@ -164,6 +189,66 @@ final class ProductBomMetabox {
 	}
 
 	/**
+	 * Renders a read-only "Cost from BOM: $X.XX" line next to the COGS
+	 * toggle — the product-edit COGS field (Advanced tab) shows the
+	 * merchant-typed defined value, which stays empty here by design
+	 * (Integrations\CogsProvider filters the *effective* value rather
+	 * than writing it), so without this line the toggle would look like
+	 * it does nothing. Silent no-op if there's no BOM yet.
+	 *
+	 * @param int $product_id The product being edited.
+	 */
+	private function render_cogs_hint( int $product_id ): void {
+		$bom = $this->boms->get_active_for_product( $product_id );
+		if ( null === $bom || array() === $bom->items ) {
+			return;
+		}
+
+		$cost    = $this->cogs_hint_cost( $product_id, $bom );
+		$message = sprintf(
+			/* translators: %s: formatted cost, including the store's currency symbol. */
+			__( 'Cost from BOM: %s (used for WooCommerce Cost of Goods Sold reporting, when enabled and the box above is checked).', 'wcbom' ),
+			wc_price( $cost )
+		);
+
+		if ( count( $bom->items ) > count( $bom->always_items() ) ) {
+			$message .= ' ' . __( 'This BOM has option-conditional lines, so the actual cost varies by the customer\'s selection — this figure covers always-consumed lines only.', 'wcbom' );
+		}
+
+		echo '<p class="description" style="margin-left:150px;">';
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wc_price() returns WooCommerce-escaped HTML; the surrounding text is a hard-coded translatable string with no user input.
+		echo $message;
+		echo '</p>';
+	}
+
+	/**
+	 * The cost figure the hint line displays: a MANUFACTURED product's
+	 * latest completed build's snapshot cost when one exists (matching
+	 * what Integrations\CogsProvider would actually report), otherwise
+	 * live always-lines cost via the shared calculation.
+	 *
+	 * @param int $product_id The product being edited.
+	 * @param Bom $bom        Its active BOM.
+	 */
+	private function cogs_hint_cost( int $product_id, Bom $bom ): float {
+		if ( ProductMode::MANUFACTURED === ProductMode::resolve( $product_id ) ) {
+			$mo = $this->mo_orders->latest_completed_for_product( $product_id );
+			if ( null !== $mo ) {
+				$cost = 0.0;
+				foreach ( $mo->items as $item ) {
+					if ( null !== $item->unit_cost ) {
+						$cost += $item->qty_per_unit * $item->unit_cost;
+					}
+				}
+
+				return $cost;
+			}
+		}
+
+		return $this->cost->for_lines( $this->matcher->resolve_for_selection( $bom, array() ) );
+	}
+
+	/**
 	 * Saves the mode/component/unit/weight-toggle fields on product save.
 	 * BOM lines themselves are saved separately via the REST API, not this
 	 * form post.
@@ -185,6 +270,9 @@ final class ProductBomMetabox {
 
 		$weight_from_bom = isset( $_POST['_wcbom_weight_from_bom'] ) ? 'yes' : 'no'; // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		update_post_meta( $product_id, '_wcbom_weight_from_bom', $weight_from_bom );
+
+		$cogs_from_bom = isset( $_POST['_wcbom_cogs_from_bom'] ) ? 'yes' : 'no'; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		update_post_meta( $product_id, '_wcbom_cogs_from_bom', $cogs_from_bom );
 	}
 
 	/**

@@ -136,8 +136,8 @@ The next `phpunit` run recreates all tables (`WC_Install::install()` + `Schema::
 - [x] Phase 4.5: BOM-derived shipping weight & add-on surcharges — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 5: reports, import/export, REST, CLI — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 6: hardening, tests, release prep — **done and verified 2026-07-30, see Progress Log** (two real bugs found and fixed along the way: transaction-nesting in StockService/BomRepository, and a Blocks-checkout stock-reservation gap in PhantomStock)
-- [ ] Phase 7: WooCommerce native COGS integration — **spec'd 2026-07-30 (BUILD_PLAN §5.11), not yet built** (~half day)
-- [ ] Phase 8: in-app documentation & training module — **spec'd 2026-07-30 (BUILD_PLAN §5.12), not yet built** (~2–3 days). **Must be built LAST** (the developer's ordering rule) so nothing is created after it and left out of training — currently that means after Phase 7; if further features are spec'd first, this moves behind them again.
+- [x] Phase 7: WooCommerce native COGS integration — **done and verified 2026-07-30, see Progress Log**
+- [ ] Phase 8: in-app documentation & training module — **spec'd 2026-07-30 (BUILD_PLAN §5.12), not yet built** (~2–3 days). **Must be built LAST** (the developer's ordering rule) so nothing is created after it and left out of training — this is now the only phase left, so it's next whenever the developer wants it.
 
 Update this checklist as phases complete. Remaining open decisions are in BUILD_PLAN.md §11.
 
@@ -146,6 +146,23 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Phase 7 complete: WooCommerce native COGS integration, verified end-to-end
+
+Built per BUILD_PLAN.md §5.11: a filter, not a data write, so this closes out the checklist item raised in that spec's own writeup.
+
+**What was built:**
+- **`Reports\BomCost`** — extracted the Σ(component regular price × qty) loop out of `MarginReport::row()` into a small shared class (`for_lines()`, taking already-resolved BOM lines). `MarginReport` now calls it too, so this plugin's own margin report and WooCommerce's Analytics can never independently disagree about the same product's cost — the spec called this the single most important structural part of the task.
+- **`ManufactureRepository::latest_completed_for_product()`** — a new query for a `MANUFACTURED` product's most recent build. Deliberately includes `partially_reversed` alongside `completed` (a judgment call beyond the spec's literal wording, recorded in the method's own docblock): a partial reversal changes remaining quantity, not the cost basis of the units still in stock from that same build, so excluding it would wrongly skip to an older MO — or the live-cost fallback — the moment a single unit from the latest batch gets reversed. Excludes fully `reversed` MOs, since none of that batch's units remain in stock.
+- **`Integrations\CogsProvider`** — hooks `woocommerce_get_product_cogs_total_value`. Bails (returns WooCommerce's own value unchanged) unless the product is `MADE_TO_ORDER`/`MANUFACTURED`, has a resolvable BOM, and has opted in via a new `_wcbom_cogs_from_bom` meta toggle (same parent-fallback rule as the existing `_wcbom_weight_from_bom`). `MADE_TO_ORDER` prices from live BOM cost resolved against the specific variation's attributes (identical resolution `MarginReport` uses); `MANUFACTURED` prices from the latest completed MO's snapshot unit costs when one exists, falling back to live cost when never built.
+- **`Admin\ProductBomMetabox`** — added the `_wcbom_cogs_from_bom` checkbox next to the existing weight toggle, plus a read-only "Cost from BOM: $X.XX" hint line so the toggle doesn't look like a no-op (the product-edit COGS field stays empty by design, since we filter the *effective* value rather than writing the *defined* one — exactly the caveat the spec flagged). The hint reuses the same MANUFACTURED-snapshot-or-live-cost logic as `CogsProvider` itself, and adds a note when the BOM has option-conditional lines (since a single static number on the parent-product screen can only ever show the always-lines floor, not a per-variation figure).
+- Wired into `Plugin::init()`: one shared `BomCost` instance now flows into `MarginReport`, `ProductBomMetabox`, and `CogsProvider`.
+
+**Regression tests** (`tests/CogsIntegrationTest.php`, 6 tests covering all of §9.14–19): inert when the feature is off (using WordPress's `setExpectedIncorrectUsage()` to accept WooCommerce's own expected `wc_doing_it_wrong()` call rather than suppressing it); a made-to-order variation's cost matches resolved BOM cost and varies correctly by option; a real placed order snapshots per-item and order-total COGS as cost × quantity; a manufactured product uses its build snapshot cost and correctly ignores a component price change made *after* the build, falling back to live cost only when never built; `MarginReport` and `CogsProvider` agree on the same product/variation; a standard (non-BOM) product's COGS is untouched even with the feature on. Full suite now 24 tests (was 18), all passing; PHPCS (52 files) and PHPStan level 6 both clean.
+
+**Verified live in the dev environment, not just via tests** (this project's standing rule for "done"): enabled `woocommerce_feature_cost_of_goods_sold_enabled`, opted the seeded made-to-order Custom 24oz Tumbler (#21) into the toggle, and confirmed via `wp eval` that `get_cogs_total_value()` returned exactly 4.05 — independently hand-verified against its actual BOM rows (Blank 3.50 + Epoxy 0.25 + Standard Cap 0.30, always-lines only, since this check was against the parent product) while `get_cogs_value()` (the defined-value field) stayed empty. Confirmed the same in a real logged-in browser session: the BOM tab's new checkbox showed checked, and the hint line read "Cost from BOM: $4.05 ... This BOM has option-conditional lines, so the actual cost varies by the customer's selection — this figure covers always-consumed lines only," matching both the CLI check and the pre-existing Phase-1 "estimated cost per unit" preview already on that same tab. Environment restored afterward (toggle off, feature option deleted, `wp wcbom audit` clean, debug.log empty).
+
+This closes out Phase 7. **Phase 8 (in-app documentation) is now the only phase left** — per the developer's standing ordering rule it's built last, and there's nothing left to build behind.
 
 ### 2026-07-30 — Home Intel laptop: PHPUnit test suite set up, full 18-test pass verified
 

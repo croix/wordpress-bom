@@ -74,10 +74,14 @@ Add-to-cart is blocked ahead of time for any option combination that's short a c
 
 Yes, and with both the block-based and the classic shortcode checkout.
 
+= Does this work with WooCommerce's Cost of Goods Sold feature? =
+
+Yes. Enable WooCommerce's Cost of Goods Sold feature and check "Cost of Goods Sold from BOM" on a product's Bill of Materials tab, and its BOM cost feeds WooCommerce's own Analytics automatically — a made-to-order product prices from its live component costs (per variation, if the option chosen affects the recipe), and a manufactured product prices from what its most recent batch actually cost to build. Nothing is written to the product's own Cost field; leave the box unchecked to type a cost by hand instead.
+
 == Changelog ==
 
 = 0.1.0 =
-* Initial release: BOM editor, order consumption/restoration, buildable stock, Component Inventory screen, Manufacture Orders, reports, CSV import/export, REST API, WP-CLI commands, low-stock digest, BOM-derived weight/surcharges, HPOS compatibility.
+* Initial release: BOM editor, order consumption/restoration, buildable stock, Component Inventory screen, Manufacture Orders, reports, CSV import/export, REST API, WP-CLI commands, low-stock digest, BOM-derived weight/surcharges, HPOS compatibility, WooCommerce Cost of Goods Sold integration.
 
 == Upgrade Notice ==
 

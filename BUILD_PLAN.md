@@ -534,7 +534,7 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 - HPOS on/off matrix, blocks vs. shortcode checkout, PHP 8.1/8.3, WC latest + latest−1.
 - Uninstall behavior (keep data by default; opt-in purge). Readme, inline docs, i18n (`wcbom` text domain).
 
-### Phase 7 — WooCommerce native COGS integration (~half day, added 2026-07-30)
+### Phase 7 — WooCommerce native COGS integration (~half day, added 2026-07-30) — ✅ **done and verified 2026-07-30, see CLAUDE.md Progress Log**
 - Per §5.11: `Integrations\CogsProvider` hooking `woocommerce_get_product_cogs_total_value`; `_wcbom_cogs_from_bom` opt-in toggle on the BOM tab; extract the Σ(component price × qty) calculation out of `MarginReport` into something shared so our margin report and WooCommerce Analytics can never disagree; `MANUFACTURED` products source cost from their latest completed MO snapshot, made-to-order from the live per-variation BOM.
 - ✅ Demo: enable WooCommerce's Cost of Goods Sold feature, place an order for a made-to-order variation, and see WooCommerce's **own** Analytics report the correct BOM-derived profit — with two different variations correctly reporting different costs, and the whole integration inert when either toggle is off.
 

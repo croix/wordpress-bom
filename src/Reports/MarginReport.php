@@ -36,10 +36,12 @@ final class MarginReport {
 	 *
 	 * @param BomRepository    $boms    BOM lookup.
 	 * @param ConditionMatcher $matcher Resolves per-variation BOM lines.
+	 * @param BomCost          $cost    Shared cost calculation (also used by Integrations\CogsProvider).
 	 */
 	public function __construct(
 		private readonly BomRepository $boms,
-		private readonly ConditionMatcher $matcher
+		private readonly ConditionMatcher $matcher,
+		private readonly BomCost $cost
 	) {}
 
 	/**
@@ -86,13 +88,9 @@ final class MarginReport {
 		// lines can never match an empty attribute map.
 		$lines = $this->matcher->resolve_for_selection( $bom, $attributes );
 
-		$cost      = 0.0;
+		$cost      = $this->cost->for_lines( $lines );
 		$surcharge = 0.0;
 		foreach ( $lines as $line ) {
-			$component = wc_get_product( $line->component_id );
-			if ( $component ) {
-				$cost += $line->qty * (float) $component->get_regular_price();
-			}
 			if ( null !== $line->surcharge && $line->surcharge > 0 ) {
 				$surcharge += $line->surcharge;
 			}
