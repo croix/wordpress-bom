@@ -48,6 +48,8 @@ final class PurchaseOrderRepository {
 			),
 			array( '%d', '%s', '%s', '%s', '%s', '%d', '%s' )
 		);
+		// freight_cost/tax_cost/fees_cost start unset — entered later via
+		// update_costs() once actual bills arrive, per class docblock.
 
 		$po_id = (int) $wpdb->insert_id;
 		$this->save_items( $po_id, $items );
@@ -106,6 +108,34 @@ final class PurchaseOrderRepository {
 			),
 			array( 'po_id' => $po_id ),
 			array( '%d', '%s', '%s', '%s' ),
+			array( '%d' )
+		);
+	}
+
+	/**
+	 * Updates the landed-cost fields — freight, tax, and other fees.
+	 * Deliberately callable at any status (unlike update_draft()'s vendor/
+	 * reference/notes/line-item fields, which lock once ordered): the real
+	 * freight or tax bill often arrives after placing, or even after
+	 * receiving, the order.
+	 *
+	 * @param int        $po_id        The purchase order's ID.
+	 * @param float|null $freight_cost Freight/shipping paid, or null to clear.
+	 * @param float|null $tax_cost     Tax paid, or null to clear.
+	 * @param float|null $fees_cost    Other fees paid, or null to clear.
+	 */
+	public function update_costs( int $po_id, ?float $freight_cost, ?float $tax_cost, ?float $fees_cost ): void {
+		global $wpdb;
+
+		$wpdb->update(
+			$wpdb->prefix . 'wcbom_purchase_orders',
+			array(
+				'freight_cost' => $freight_cost,
+				'tax_cost'     => $tax_cost,
+				'fees_cost'    => $fees_cost,
+			),
+			array( 'po_id' => $po_id ),
+			array( '%f', '%f', '%f' ),
 			array( '%d' )
 		);
 	}
@@ -327,6 +357,9 @@ final class PurchaseOrderRepository {
 			$row['reference'],
 			$row['expected_date'],
 			$row['notes'],
+			null !== $row['freight_cost'] ? (float) $row['freight_cost'] : null,
+			null !== $row['tax_cost'] ? (float) $row['tax_cost'] : null,
+			null !== $row['fees_cost'] ? (float) $row['fees_cost'] : null,
 			(int) $row['created_by'],
 			(string) $row['created_at'],
 			$row['ordered_at'],

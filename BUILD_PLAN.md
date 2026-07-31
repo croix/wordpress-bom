@@ -513,11 +513,19 @@ PO status machine, enforced in a `PurchaseOrderService` (mirroring `ManufactureS
 - `draft` — editable lines, counts toward nothing. Deletable outright (same rule as draft MOs: nothing has moved).
 - `ordered` — the merchant has actually placed it with the vendor (`ordered_at` stamped). Lines lock (quantities/costs stop being editable; cancel-and-redraft is the correction path). Begins counting toward on-order quantities.
 - `partially_received` / `received` — receiving happens per-line ("received 480 of the 500 blanks"), cumulative into `qty_received`, `closed_at` stamped when every line is full. **Over-receipt is allowed** (vendors ship extra; refusing to record reality would be the §13 anti-pattern) — recorded as `qty_received > qty_ordered`, flagged visually, never blocking.
-- `cancelled` — allowed from draft or ordered; stops counting toward on-order. A partially-received PO can also be cancelled ("vendor can't fulfil the rest") — already-received stock stays received, remaining quantity simply stops being expected.
+- `cancelled` — allowed from draft, ordered, or partially_received; stops counting toward on-order. **Deliberately the same action covers two different real-world reasons** (decided 2026-07-31, when the developer asked for a way to close out an under-received PO): "the order was called off before anything shipped" and "we're accepting a short delivery and closing this out." Both end in the same state — already-received stock stays received, the remainder simply stops being expected — so a separate "closed" status would only duplicate this transition for no behavioral difference. The React UI adjusts the button label/confirmation copy contextually (reads "Close" instead of "Cancel" when status is `partially_received`), but it's one `PurchaseOrderService::cancel()` method and one REST route underneath.
 
 **Receiving is a stock write, so it uses the full existing machinery:** one `StockService::adjust_many()` call per receipt (new `Ledger::REASON_PO_RECEIVE = 'po_receive'`, `ref_type 'purchase_order'`, `ref_id` = po_id — the VARCHAR reason column widened 2026-07-30 makes this migration-free), wrapped in an `OperationGuard` idempotency key exactly like MO completion (§13.6), so a double-submitted receive can never double-stock.
 
 **PO line `unit_cost` is a historical record and is never written to any product field.** Decided here so it isn't relitigated: a component's `regular_price` is this plugin's cost basis (§5.5, §5.11) *and* — for dual-role components like the blank tumbler — its live retail price. Auto-pushing a wholesale PO cost into it would corrupt storefront pricing. The never-implemented `_wcbom_component_cost` meta (§4) remains the natural future home for a true separated cost basis; explicitly out of scope here.
+
+#### Freight, tax, and fees — amortized landed cost (added 2026-07-31)
+
+Three additional PO-level fields — `freight_cost`, `tax_cost`, `fees_cost` (all nullable DECIMAL) — capturing the real cost of getting an order landed, beyond the per-line unit prices. **Editable at any PO status**, unlike the vendor/reference/line items (which lock once ordered): the real freight or tax bill routinely arrives after placing the order, or even after it's fully received, so a status restriction here would just force the merchant to re-open something that shouldn't need reopening. A dedicated `update_costs()` path (repository + service + `PUT /purchase-orders/<id>/costs`) exists separately from the draft-only `update_draft()` for exactly this reason.
+
+**Amortized proportional to each line's ordered value** (`qty_ordered × unit_cost`) — the standard landed-cost basis — via a small dedicated `Purchasing\LandedCost` class, kept separate from the REST controller so the allocation math is unit-testable on its own. A line with no `unit_cost` entered has no value to allocate by, so it gets none of the fee total and shows "—" for landed cost; the PO view's total-fees line still reads the true total regardless, so a merchant sees at a glance which lines couldn't participate and knows to enter a unit cost for a complete breakdown — no silent loss, no invented secondary bucket.
+
+**Display-only, same reasoning as `unit_cost` itself**: computed live from the current freight/tax/fee fields on every read, never written to a product field or fed into `Reports\BomCost`/`Integrations\CogsProvider`. Feeding it into cost/margin reporting was considered and explicitly deferred — it raises the question of which PO's landed cost a shared component should use when it's been ordered from multiple vendors at different freight rates, which is real complexity this addendum doesn't need to solve to deliver the requested landed-cost visibility.
 
 #### Surfacing on-order awareness
 
@@ -703,6 +711,11 @@ Phase 10 (nested BOMs, §5.14) adds:
 §11 closeout (2026-07-30) adds:
 
 28. With "Allow negative component stock" **off** (default), a manual adjustment below zero is blocked without the explicit override; with it **on**, the same adjustment proceeds and ledgers the exact negative. Order consumption goes negative (flagged) in both states — §13.3 is not a setting.
+
+Phase 9 addendum (freight/tax/fees + close relabeling, added 2026-07-31) adds:
+
+29. Freight/tax/fees are editable via `update_costs()` regardless of PO status — draft, ordered, or fully received — and `null` clears a previously-set field rather than zeroing it.
+30. Landed cost amortizes proportional to each line's ordered value; a line with no unit_cost gets zero allocation and a null landed_unit_cost, while the PO's total-fees figure still reflects the true total. Zero fees means every line's landed cost equals its plain unit cost.
 
 ---
 

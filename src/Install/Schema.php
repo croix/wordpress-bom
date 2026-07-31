@@ -18,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Schema {
 
-	public const DB_VERSION = '0.5.0';
+	public const DB_VERSION = '0.6.0';
 
 	private const OPTION_KEY = 'wcbom_db_version';
 
@@ -149,6 +149,9 @@ CREATE TABLE {$prefix}wcbom_purchase_orders (
   reference VARCHAR(191) NULL,
   expected_date DATE NULL,
   notes TEXT NULL,
+  freight_cost DECIMAL(12,4) NULL,
+  tax_cost DECIMAL(12,4) NULL,
+  fees_cost DECIMAL(12,4) NULL,
   created_by BIGINT UNSIGNED NOT NULL,
   created_at DATETIME NOT NULL,
   ordered_at DATETIME NULL,

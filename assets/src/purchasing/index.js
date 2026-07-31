@@ -92,14 +92,24 @@ function PurchaseOrdersTab( { restNamespace } ) {
 			.catch( ( err ) => setNotice( { status: 'error', message: err.message || String( err ) } ) );
 	}
 
+	// Same underlying action (POST .../cancel) for two different real-world
+	// reasons — "called off before anything shipped" vs. "accepting a short
+	// delivery and closing this out" — so only the button label and
+	// confirmation copy differ by status; see PurchaseOrderService::cancel()'s
+	// docblock for why there's no separate status for the latter.
 	function cancel( order ) {
-		if ( ! window.confirm( __( 'Cancel this purchase order? Already-received stock is unaffected — only the remaining outstanding quantity stops being expected.', 'wcbom' ) ) ) {
+		const isPartial = 'partially_received' === order.status;
+		const confirmText = isPartial
+			? __( 'Close this purchase order? The remaining outstanding quantity will no longer be expected. Stock already received is unaffected.', 'wcbom' )
+			: __( 'Cancel this purchase order? Already-received stock is unaffected — only the remaining outstanding quantity stops being expected.', 'wcbom' );
+
+		if ( ! window.confirm( confirmText ) ) {
 			return;
 		}
 
 		apiFetch( { path: `/${ restNamespace }/purchase-orders/${ order.po_id }/cancel`, method: 'POST' } )
 			.then( () => {
-				setNotice( { status: 'success', message: __( 'Purchase order cancelled.', 'wcbom' ) } );
+				setNotice( { status: 'success', message: isPartial ? __( 'Purchase order closed.', 'wcbom' ) : __( 'Purchase order cancelled.', 'wcbom' ) } );
 				load();
 			} )
 			.catch( ( err ) => setNotice( { status: 'error', message: err.message || String( err ) } ) );
@@ -203,17 +213,20 @@ function PurchaseOrdersTab( { restNamespace } ) {
 												{ __( 'Receive', 'wcbom' ) }
 											</Button>{ ' ' }
 											<Button variant="tertiary" isDestructive onClick={ () => cancel( order ) }>
-												{ __( 'Cancel', 'wcbom' ) }
-											</Button>
+												{ 'partially_received' === order.status ? __( 'Close', 'wcbom' ) : __( 'Cancel', 'wcbom' ) }
+											</Button>{ ' ' }
 										</>
 									) }
 									{ 'draft' !== order.status && (
-										<>{ ' ' }
+										<>
 											<Button variant="tertiary" onClick={ () => refetchThenOpen( order, 'view' ) }>
 												{ __( 'View', 'wcbom' ) }
-											</Button>
+											</Button>{ ' ' }
 										</>
 									) }
+									<Button variant="tertiary" onClick={ () => refetchThenOpen( order, 'costs' ) }>
+										{ __( 'Edit costs', 'wcbom' ) }
+									</Button>
 								</td>
 							</tr>
 						) ) }
@@ -246,6 +259,15 @@ function PurchaseOrdersTab( { restNamespace } ) {
 
 			{ detailOrder && 'view' === detailOrder.mode && (
 				<ViewModal order={ detailOrder.order } onClose={ () => setDetailOrder( null ) } />
+			) }
+
+			{ detailOrder && 'costs' === detailOrder.mode && (
+				<CostsModal
+					restNamespace={ restNamespace }
+					order={ detailOrder.order }
+					onClose={ () => setDetailOrder( null ) }
+					onSaved={ () => onActioned( __( 'Costs updated.', 'wcbom' ) ) }
+				/>
 			) }
 		</>
 	);
@@ -538,7 +560,97 @@ function ReceiveModal( { restNamespace, order, onClose, onReceived } ) {
 	);
 }
 
+// Deliberately its own modal, separate from PurchaseOrderModal's draft-only
+// vendor/reference/line-item editing: freight/tax/fees are editable at any
+// PO status, since the real bill often arrives after placing or receiving.
+function CostsModal( { restNamespace, order, onClose, onSaved } ) {
+	const [ freight, setFreight ] = useState( null !== order.freight_cost ? String( order.freight_cost ) : '' );
+	const [ tax, setTax ] = useState( null !== order.tax_cost ? String( order.tax_cost ) : '' );
+	const [ fees, setFees ] = useState( null !== order.fees_cost ? String( order.fees_cost ) : '' );
+	const [ submitting, setSubmitting ] = useState( false );
+	const [ error, setError ] = useState( null );
+
+	function submit() {
+		setError( null );
+		setSubmitting( true );
+
+		apiFetch( {
+			path: `/${ restNamespace }/purchase-orders/${ order.po_id }/costs`,
+			method: 'PUT',
+			data: {
+				freight_cost: '' !== freight ? parseFloat( freight ) : null,
+				tax_cost: '' !== tax ? parseFloat( tax ) : null,
+				fees_cost: '' !== fees ? parseFloat( fees ) : null,
+			},
+		} )
+			.then( onSaved )
+			.catch( ( err ) => setError( err.message || String( err ) ) )
+			.finally( () => setSubmitting( false ) );
+	}
+
+	return (
+		<Modal title={ sprintf(
+			/* translators: %d: purchase order ID */
+			__( 'Edit costs — PO #%d', 'wcbom' ),
+			order.po_id
+		) } onRequestClose={ onClose }>
+			{ error && (
+				<Notice status="error" isDismissible={ false }>
+					{ error }
+				</Notice>
+			) }
+
+			<p className="description">
+				{ __( 'Freight, tax, and other fees are amortized across this PO\'s line items proportional to their ordered value, for a landed-cost view on the PO detail — never written to any product\'s price.', 'wcbom' ) }
+			</p>
+
+			<Field>
+				<TextControl
+					label={ __( 'Freight / shipping', 'wcbom' ) }
+					type="number"
+					step="0.01"
+					value={ freight }
+					onChange={ setFreight }
+					__next40pxDefaultSize
+				/>
+			</Field>
+			<Field>
+				<TextControl
+					label={ __( 'Tax', 'wcbom' ) }
+					type="number"
+					step="0.01"
+					value={ tax }
+					onChange={ setTax }
+					__next40pxDefaultSize
+				/>
+			</Field>
+			<Field>
+				<TextControl
+					label={ __( 'Other fees', 'wcbom' ) }
+					type="number"
+					step="0.01"
+					value={ fees }
+					onChange={ setFees }
+					__next40pxDefaultSize
+				/>
+			</Field>
+
+			<p>
+				<Button variant="primary" isBusy={ submitting } disabled={ submitting } onClick={ submit }>
+					{ __( 'Save', 'wcbom' ) }
+				</Button>{ ' ' }
+				<Button variant="tertiary" disabled={ submitting } onClick={ onClose }>
+					{ __( 'Cancel', 'wcbom' ) }
+				</Button>
+			</p>
+		</Modal>
+	);
+}
+
 function ViewModal( { order, onClose } ) {
+	const hasFees = order.total_fees > 0;
+	const someMissingCost = hasFees && order.items.some( ( item ) => null === item.unit_cost );
+
 	return (
 		<Modal title={ sprintf(
 			/* translators: 1: purchase order ID, 2: vendor name */
@@ -561,6 +673,7 @@ function ViewModal( { order, onClose } ) {
 						<th>{ __( 'Ordered', 'wcbom' ) }</th>
 						<th>{ __( 'Received', 'wcbom' ) }</th>
 						<th>{ __( 'Unit cost', 'wcbom' ) }</th>
+						{ hasFees && <th>{ __( 'Landed unit cost', 'wcbom' ) }</th> }
 					</tr>
 				</thead>
 				<tbody>
@@ -570,10 +683,27 @@ function ViewModal( { order, onClose } ) {
 							<td>{ formatNumber( item.qty_ordered ) } { item.unit }</td>
 							<td>{ formatNumber( item.qty_received ) } { item.unit }</td>
 							<td>{ null !== item.unit_cost ? `$${ formatNumber( item.unit_cost ) }` : '—' }</td>
+							{ hasFees && (
+								<td>{ null !== item.landed_unit_cost ? `$${ formatNumber( item.landed_unit_cost ) }` : '—' }</td>
+							) }
 						</tr>
 					) ) }
 				</tbody>
 			</table>
+
+			{ hasFees && (
+				<p className="description">
+					{ sprintf(
+						/* translators: 1: freight cost, 2: tax cost, 3: other fees, 4: total */
+						__( 'Freight $%1$s + tax $%2$s + fees $%3$s = $%4$s amortized across lines by ordered value.', 'wcbom' ),
+						formatNumber( order.freight_cost || 0 ),
+						formatNumber( order.tax_cost || 0 ),
+						formatNumber( order.fees_cost || 0 ),
+						formatNumber( order.total_fees )
+					) }
+					{ someMissingCost && ' ' + __( 'Lines with no unit cost entered show "—" for landed cost — enter a unit cost on them for a complete breakdown.', 'wcbom' ) }
+				</p>
+			) }
 
 			<p>
 				<Button variant="tertiary" onClick={ onClose }>

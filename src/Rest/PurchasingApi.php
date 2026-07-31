@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace WCBOM\Rest;
 
+use WCBOM\Purchasing\LandedCost;
 use WCBOM\Purchasing\PurchaseOrder;
 use WCBOM\Purchasing\PurchaseOrderItem;
 use WCBOM\Purchasing\PurchaseOrderRepository;
@@ -36,14 +37,16 @@ final class PurchasingApi {
 	/**
 	 * Constructs the controller.
 	 *
-	 * @param PurchaseOrderService    $purchasing The orchestration service.
-	 * @param PurchaseOrderRepository $orders     PO lookup for list/get.
-	 * @param VendorRepository        $vendors    Vendor CRUD.
+	 * @param PurchaseOrderService    $purchasing  The orchestration service.
+	 * @param PurchaseOrderRepository $orders      PO lookup for list/get.
+	 * @param VendorRepository        $vendors     Vendor CRUD.
+	 * @param LandedCost              $landed_cost Freight/tax/fee amortization for display.
 	 */
 	public function __construct(
 		private readonly PurchaseOrderService $purchasing,
 		private readonly PurchaseOrderRepository $orders,
-		private readonly VendorRepository $vendors
+		private readonly VendorRepository $vendors,
+		private readonly LandedCost $landed_cost
 	) {}
 
 	/**
@@ -125,6 +128,16 @@ final class PurchasingApi {
 					'callback'            => array( $this, 'delete_draft' ),
 					'permission_callback' => array( $this, 'can_manage' ),
 				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/purchase-orders/(?P<id>\d+)/costs',
+			array(
+				'methods'             => WP_REST_Server::EDITABLE,
+				'callback'            => array( $this, 'update_costs' ),
+				'permission_callback' => array( $this, 'can_manage' ),
 			)
 		);
 
@@ -325,6 +338,28 @@ final class PurchasingApi {
 	}
 
 	/**
+	 * Updates a PO's landed-cost fields (freight/tax/fees). No status
+	 * restriction — see PurchaseOrderService::update_costs().
+	 *
+	 * @param WP_REST_Request $request Route param: id. Body: freight_cost?, tax_cost?, fees_cost?.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function update_costs( WP_REST_Request $request ) {
+		try {
+			$po = $this->purchasing->update_costs(
+				(int) $request->get_param( 'id' ),
+				$this->optional_float( $request, 'freight_cost' ),
+				$this->optional_float( $request, 'tax_cost' ),
+				$this->optional_float( $request, 'fees_cost' )
+			);
+		} catch ( \RuntimeException $e ) {
+			return new WP_Error( 'wcbom_po_update_costs_failed', $e->getMessage(), array( 'status' => 400 ) );
+		}
+
+		return new WP_REST_Response( array( 'order' => $this->present_order( $po ) ) );
+	}
+
+	/**
 	 * Places a draft PO with its vendor.
 	 *
 	 * @param WP_REST_Request $request Route param: id.
@@ -451,6 +486,20 @@ final class PurchasingApi {
 	}
 
 	/**
+	 * A numeric body param, null when absent/blank — used for the
+	 * freight/tax/fees fields, where null means "clear this field" rather
+	 * than "zero it out".
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @param string          $key     Param name.
+	 */
+	private function optional_float( WP_REST_Request $request, string $key ): ?float {
+		$value = $request->get_param( $key );
+
+		return null !== $value && '' !== $value ? (float) $value : null;
+	}
+
+	/**
 	 * Shapes a Vendor for the REST response.
 	 *
 	 * @param Vendor|null $vendor The vendor to present.
@@ -480,7 +529,8 @@ final class PurchasingApi {
 	 * @return array<string,mixed>
 	 */
 	private function present_order( PurchaseOrder $po ): array {
-		$vendor = $this->vendors->get( $po->vendor_id );
+		$vendor      = $this->vendors->get( $po->vendor_id );
+		$landed_cost = $this->landed_cost->for_order( $po );
 
 		return array(
 			'po_id'         => $po->po_id,
@@ -490,24 +540,31 @@ final class PurchasingApi {
 			'reference'     => $po->reference,
 			'expected_date' => $po->expected_date,
 			'notes'         => $po->notes,
+			'freight_cost'  => $po->freight_cost,
+			'tax_cost'      => $po->tax_cost,
+			'fees_cost'     => $po->fees_cost,
+			'total_fees'    => $landed_cost['total_fees'],
 			'created_by'    => $po->created_by,
 			'created_at'    => $po->created_at,
 			'ordered_at'    => $po->ordered_at,
 			'closed_at'     => $po->closed_at,
 			'items'         => array_map(
-				function ( PurchaseOrderItem $item ): array {
+				function ( PurchaseOrderItem $item ) use ( $landed_cost ): array {
 					$component = wc_get_product( $item->component_id );
 					$unit      = $component ? get_post_meta( $component->get_id(), '_wcbom_unit', true ) : '';
+					$allocated = $landed_cost['items'][ $item->poi_id ];
 
 					return array(
-						'poi_id'          => $item->poi_id,
-						'component_id'    => $item->component_id,
-						'name'            => $component ? $component->get_name() : null,
-						'unit'            => '' !== $unit ? $unit : 'ea',
-						'qty_ordered'     => $item->qty_ordered,
-						'qty_received'    => $item->qty_received,
-						'qty_outstanding' => $item->qty_outstanding(),
-						'unit_cost'       => $item->unit_cost,
+						'poi_id'           => $item->poi_id,
+						'component_id'     => $item->component_id,
+						'name'             => $component ? $component->get_name() : null,
+						'unit'             => '' !== $unit ? $unit : 'ea',
+						'qty_ordered'      => $item->qty_ordered,
+						'qty_received'     => $item->qty_received,
+						'qty_outstanding'  => $item->qty_outstanding(),
+						'unit_cost'        => $item->unit_cost,
+						'amortized_fee'    => $allocated['amortized_fee'],
+						'landed_unit_cost' => $allocated['landed_unit_cost'],
 					);
 				},
 				$po->items

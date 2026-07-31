@@ -92,6 +92,25 @@ final class PurchaseOrderService {
 	}
 
 	/**
+	 * Updates the landed-cost fields (freight/tax/fees). Deliberately has
+	 * no status restriction — see PurchaseOrderRepository::update_costs().
+	 *
+	 * @param int        $po_id        The purchase order to update.
+	 * @param float|null $freight_cost Freight/shipping paid, or null to clear.
+	 * @param float|null $tax_cost     Tax paid, or null to clear.
+	 * @param float|null $fees_cost    Other fees paid, or null to clear.
+	 *
+	 * @throws \RuntimeException If the PO is unknown.
+	 */
+	public function update_costs( int $po_id, ?float $freight_cost, ?float $tax_cost, ?float $fees_cost ): PurchaseOrder {
+		$this->must_get( $po_id );
+
+		$this->orders->update_costs( $po_id, $freight_cost, $tax_cost, $fees_cost );
+
+		return $this->must_get( $po_id );
+	}
+
+	/**
 	 * Places a draft PO with its vendor. Idempotent by state — a PO that's
 	 * already past draft is returned as-is rather than re-placed.
 	 *
@@ -213,6 +232,15 @@ final class PurchaseOrderService {
 	 * remaining outstanding quantity simply stops counting toward
 	 * on-order. Idempotent for an already-cancelled PO; refuses a fully
 	 * received one (nothing left to cancel).
+	 *
+	 * Deliberately the same action for two different real-world reasons —
+	 * "the order was called off before anything shipped" and "we're
+	 * accepting a short delivery and closing this out" — rather than a
+	 * separate status for the latter (decided 2026-07-30): both end in the
+	 * same state (stops counting as on-order, received stock stands), so a
+	 * second status would only duplicate this method for no behavioral
+	 * difference. `Rest\PurchasingApi`/the React UI adjust the button
+	 * label and confirmation copy contextually instead.
 	 *
 	 * @param int $po_id The purchase order to cancel.
 	 *

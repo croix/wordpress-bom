@@ -150,6 +150,20 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
 
+### 2026-07-31 — Phase 9 addendum: close-an-under-received-PO + freight/tax/fees landed cost
+
+the developer flagged two workflow gaps after using Phase 9: no way to close out a PO that's never going to be fully received, and no way to capture freight/taxes/fees against a PO with amortization across its lines.
+
+**Closing an under-received PO — resolved as no schema change, on the developer's own call.** Asked first rather than guessing: a new distinct "closed" status, or just relabel the existing Cancel action (which already stops a partially-received PO from counting as on-order and leaves received stock alone)? the developer picked reusing Cancel. `PurchaseOrderService::cancel()` is unchanged; the React UI now shows "Close" instead of "Cancel" — and a matching confirmation message — specifically when a PO's status is `partially_received`, contextual copy only, same REST route and status transition underneath. Verified live: placed a 2-line PO, partially received it, confirmed the button read "Close" (not "Cancel") at that exact status.
+
+**Freight/tax/fees — three new nullable `wcbom_purchase_orders` columns** (`freight_cost`/`tax_cost`/`fees_cost`, schema bumped to 0.6.0), **editable at any PO status** via a dedicated `update_costs()` path (repository + service + new `PUT /purchase-orders/<id>/costs` route) — deliberately separate from the draft-only `update_draft()`, since the real freight/tax bill routinely arrives after placing or even after fully receiving an order. New always-available "Edit costs" button on every PO row regardless of status.
+
+**Amortization — asked and confirmed before building:** proportional to each line's ordered value (`qty_ordered × unit_cost`), computed in a new small dedicated `Purchasing\LandedCost` class (kept out of the REST controller so the math is unit-testable on its own) and **display-only** — same reasoning as `PurchaseOrderItem::$unit_cost` — never written to a product field or fed into `Reports\BomCost`/`Integrations\CogsProvider` (explicitly considered and deferred: which PO's landed cost should a shared component ordered from multiple vendors use? — real complexity not needed to deliver what was actually asked for). A line with no unit_cost entered gets zero allocation and shows "—" for landed cost in the PO view, with a note explaining why; the total-fees figure shown still reflects the true total regardless.
+
+**Verified live, numbers hand-checked:** a 2-line PO (100 × $2.00 blanks, 50 × $0.05 glitter) with $30 freight + $5 tax entered via the real "Edit costs" modal produced landed unit costs of exactly $2.3457 and $0.0586 — matching by-hand calculation (Σvalue = $202.50; blank's amortized fee = 35 × 200/202.50 = $34.57; glitter's = 35 × 2.5/202.50 = $0.43) to the cent.
+
+New `tests/LandedCostTest.php` (4 tests: proportional allocation, all-three-fees summing, zero-unit-cost line getting zero allocation, zero-fees meaning landed cost equals plain unit cost) plus one new `PurchasingTest` case proving costs are editable at draft, ordered, and fully-received status and that `null` clears a field rather than zeroing it. Full suite now 40 tests (was 35), all passing; PHPCS (63 files) and PHPStan level 6 both clean; `wp i18n make-pot` clean. BUILD_PLAN.md §5.13 and §9 (scenarios 29–30) updated.
+
 ### 2026-07-30 — Phase 9 complete: vendors & purchase orders, strictly opt-in, verified end-to-end
 
 Built per BUILD_PLAN.md §5.13, structurally a sibling of Manufacture Orders (tables + repository + service + React page + REST), reusing StockService/OperationGuard/the BOM editor's component-picker wholesale.

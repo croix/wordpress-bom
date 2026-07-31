@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 use WCBOM\Admin\PurchasingPage;
 use WCBOM\Bom\BomRepository;
+use WCBOM\Purchasing\LandedCost;
 use WCBOM\Purchasing\PurchaseOrder;
 use WCBOM\Purchasing\PurchaseOrderRepository;
 use WCBOM\Purchasing\PurchaseOrderService;
@@ -45,7 +46,7 @@ final class PurchasingTest extends WCBOM_UnitTestCase {
 		$this->assertFalse( has_action( 'admin_menu', array( $page, 'add_menu_page' ) ), 'The Purchasing menu page must not be registered when the feature is off.' );
 
 		$po_orders = new PurchaseOrderRepository();
-		$api       = new PurchasingApi( new PurchaseOrderService( $po_orders, new StockService( new Ledger() ), new OperationGuard() ), $po_orders, new VendorRepository() );
+		$api       = new PurchasingApi( new PurchaseOrderService( $po_orders, new StockService( new Ledger() ), new OperationGuard() ), $po_orders, new VendorRepository(), new LandedCost() );
 		$api->register_routes();
 		$this->assertArrayNotHasKey( '/wcbom/v1/vendors', rest_get_server()->get_routes(), 'No vendor REST route may exist when the feature is off.' );
 		$this->assertArrayNotHasKey( '/wcbom/v1/purchase-orders', rest_get_server()->get_routes(), 'No purchase-order REST route may exist when the feature is off.' );
@@ -210,5 +211,38 @@ final class PurchasingTest extends WCBOM_UnitTestCase {
 		$placed = $service->place( $placed->po_id );
 		$this->assertFalse( $service->delete_draft( $placed->po_id ), 'An ordered PO must not be deletable.' );
 		$this->assertNotNull( $orders->get( $placed->po_id ), 'A refused delete must leave the PO intact.' );
+	}
+
+	/**
+	 * Freight/tax/fees (added 2026-07-31): editable regardless of PO
+	 * status, unlike vendor/reference/line items which lock once ordered.
+	 */
+	public function test_costs_are_editable_at_every_status(): void {
+		update_option( VendorsFeature::OPTION, 'yes' );
+
+		$blank   = $this->create_component( 'Blank', 0, 'ea', '2.00' );
+		$vendor  = new VendorRepository();
+		$orders  = new PurchaseOrderRepository();
+		$service = new PurchaseOrderService( $orders, new StockService( new Ledger() ), new OperationGuard() );
+
+		$vendor_id = $vendor->create( 'Acme Blanks Co', null, null, null, null );
+		$po        = $service->create_draft( $vendor_id, array( array( 'component_id' => $blank, 'qty_ordered' => 100, 'unit_cost' => 2.00 ) ), null, null, null );
+
+		// Editable while still a draft.
+		$po = $service->update_costs( $po->po_id, 30.0, 5.0, 0.0 );
+		$this->assertSame( 30.0, $po->freight_cost );
+		$this->assertSame( 5.0, $po->tax_cost );
+		$this->assertSame( 0.0, $po->fees_cost );
+
+		// And still editable after placing and fully receiving — the real
+		// freight/tax bill often arrives after the fact.
+		$po = $service->place( $po->po_id );
+		$po = $service->receive( $po->po_id, array( $po->items[0]->poi_id => 100.0 ), wp_generate_uuid4() );
+		$this->assertSame( PurchaseOrder::STATUS_RECEIVED, $po->status );
+
+		$po = $service->update_costs( $po->po_id, 45.0, null, null );
+		$this->assertSame( 45.0, $po->freight_cost );
+		$this->assertNull( $po->tax_cost, 'Passing null must clear a previously-set field.' );
+		$this->assertNull( $po->fees_cost );
 	}
 }
