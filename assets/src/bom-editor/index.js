@@ -10,8 +10,21 @@ import {
 } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import { __, sprintf } from '@wordpress/i18n';
+import { decodeEntities } from '@wordpress/html-entities';
 
 import ComponentPicker from './component-picker';
+
+// REST error messages are PHP exception text run through esc_html() at the
+// PHP side (a WPCS-enforced convention, WordPress.Security.EscapeOutput.
+// ExceptionNotEscaped) — correct for a string that might get echoed
+// directly into HTML elsewhere, but this UI renders it as plain text via
+// JSX, which doesn't decode entities on its own. Without this, a message
+// naming a product in quotes (e.g. the nested-BOM guards in
+// Bom\BomRepository) would show literal "&quot;"/"&#039;" instead of the
+// real characters.
+function errorMessage( err ) {
+	return decodeEntities( err.message || String( err ) );
+}
 
 const CONDITION_ALWAYS = 'always';
 const CONDITION_ATTRIBUTE = 'attribute';
@@ -54,7 +67,7 @@ function BomEditor( { productId, restNamespace, variationAttributes, weightFromB
 				const bom = response.bom;
 				setItems( bom ? bom.items.map( fromServer ) : [] );
 			} )
-			.catch( ( err ) => setError( err.message || String( err ) ) )
+			.catch( ( err ) => setError( errorMessage( err ) ) )
 			.finally( () => setLoading( false ) );
 
 		loadBuildable();
@@ -99,7 +112,7 @@ function BomEditor( { productId, restNamespace, variationAttributes, weightFromB
 				setItems( bom.items.map( fromServer ) );
 				loadBuildable();
 			} )
-			.catch( ( err ) => setError( err.message || String( err ) ) )
+			.catch( ( err ) => setError( errorMessage( err ) ) )
 			.finally( () => setSaving( false ) );
 	}
 

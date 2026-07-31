@@ -84,10 +84,17 @@ final class BomRepository {
 	 * @param array<int,array{component_id:int,qty:float,condition_type:string,condition_key:?string,condition_value:?string,surcharge:?float}> $items Ordered lines to save.
 	 * @param int                                                                                                                               $user_id User performing the save.
 	 *
-	 * @throws \Throwable Re-thrown after rolling back the transaction.
+	 * @throws \Throwable Re-thrown after rolling back the transaction; also
+	 *                    thrown (before the transaction opens) as a plain
+	 *                    \RuntimeException if a component is made-to-order,
+	 *                    or if any component's own recipe (nested BOMs,
+	 *                    §5.14) would reach back to $product_id.
 	 */
 	public function save( int $product_id, array $items, int $user_id ): Bom {
 		global $wpdb;
+
+		$this->reject_made_to_order_components( $items );
+		$this->reject_cycles( $product_id, $items );
 
 		// See Stock\StockService::adjust_many() for why this can't be a bare
 		// START TRANSACTION: MySQL implicitly commits any already-open
@@ -274,6 +281,117 @@ final class BomRepository {
 		);
 
 		return array_map( 'intval', $ids );
+	}
+
+	/**
+	 * Rejects any proposed line whose component is itself made-to-order
+	 * (BUILD_PLAN.md §5.14). A made-to-order product's own
+	 * `get_stock_quantity()` is Stock\StorefrontStock's phantom-buildable
+	 * filter, not a real on-hand count — allowing one as a component would
+	 * feed a derived fiction into the parent's buildable math and, on any
+	 * A→B→A cycle, recurse infinitely at compute time (compute(A) →
+	 * get_stock_quantity(B) → filter → compute(B) → get_stock_quantity(A) → …).
+	 * Physically-stocked (manufactured or standard) sub-assemblies only.
+	 *
+	 * @param array<int,array{component_id:int,qty:float,condition_type:string,condition_key:?string,condition_value:?string,surcharge:?float}> $items Proposed lines.
+	 *
+	 * @throws \RuntimeException If a component is made-to-order.
+	 */
+	private function reject_made_to_order_components( array $items ): void {
+		foreach ( $items as $item ) {
+			$component_id = (int) $item['component_id'];
+
+			if ( ProductMode::MADE_TO_ORDER !== ProductMode::resolve( $component_id ) ) {
+				continue;
+			}
+
+			$component = wc_get_product( $component_id );
+
+			throw new \RuntimeException(
+				esc_html(
+					sprintf(
+						/* translators: %s: component product name */
+						__( '"%s" is a made-to-order product and can\'t be used as a BOM component — its stock is a computed buildable number, not a real on-hand count. Use a manufactured or standard product as the sub-assembly instead.', 'wcbom' ),
+						$component ? $component->get_name() : "#{$component_id}"
+					)
+				)
+			);
+		}
+	}
+
+	/**
+	 * Rejects the save if $product_id would become reachable from any of
+	 * the proposed components' own active BOMs — a nested-BOM cycle
+	 * (BUILD_PLAN.md §5.14), covering direct self-reference (a component
+	 * pointing at $product_id itself) and any longer A→B→A chain through
+	 * active sub-assembly recipes. Made-to-order components are already
+	 * rejected above, so the only cycles reachable here are among
+	 * manufactured/standard products — they can't recurse infinitely at
+	 * compute time, but would still corrupt manufacture-order planning.
+	 *
+	 * @param int                                                                                                                               $product_id The product this BOM is being saved for.
+	 * @param array<int,array{component_id:int,qty:float,condition_type:string,condition_key:?string,condition_value:?string,surcharge:?float}> $items      Proposed lines.
+	 *
+	 * @throws \RuntimeException If a cycle would be created.
+	 */
+	private function reject_cycles( int $product_id, array $items ): void {
+		foreach ( $items as $item ) {
+			$component_id = (int) $item['component_id'];
+
+			if ( ! $this->reaches( $component_id, $product_id, array() ) ) {
+				continue;
+			}
+
+			$component = wc_get_product( $component_id );
+
+			throw new \RuntimeException(
+				esc_html(
+					sprintf(
+						/* translators: %s: component product name */
+						__( 'This would create a circular Bill of Materials — "%s", directly or through its own recipe, eventually includes this product as a component.', 'wcbom' ),
+						$component ? $component->get_name() : "#{$component_id}"
+					)
+				)
+			);
+		}
+	}
+
+	/**
+	 * Whether $target_id is reachable by walking $from_id's own active BOM
+	 * (and its components' BOMs, recursively). Depth-capped at 10 levels
+	 * as belt-and-braces — with made-to-order components already
+	 * rejected, legitimate manufactured-sub-assembly chains this deep are
+	 * not expected, so hitting the cap is treated as "no cycle found"
+	 * rather than a false-positive rejection.
+	 *
+	 * @param int            $from_id   Component ID to start the walk from.
+	 * @param int            $target_id The product ID being checked for reachability.
+	 * @param array<int,int> $visited   Component IDs already walked, to avoid re-walking a shared sub-assembly.
+	 * @param int            $depth     Current recursion depth (internal — callers pass the default).
+	 */
+	private function reaches( int $from_id, int $target_id, array $visited, int $depth = 0 ): bool {
+		if ( $from_id === $target_id ) {
+			return true;
+		}
+
+		if ( $depth >= 10 || in_array( $from_id, $visited, true ) ) {
+			return false;
+		}
+
+		$visited[] = $from_id;
+
+		$bom = $this->get_active_for_product( $from_id );
+		if ( null === $bom ) {
+			return false;
+		}
+
+		foreach ( $bom->items as $line ) {
+			if ( $this->reaches( $line->component_id, $target_id, $visited, $depth + 1 ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

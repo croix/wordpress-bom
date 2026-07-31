@@ -139,8 +139,8 @@ The next `phpunit` run recreates all tables (`WC_Install::install()` + `Schema::
 - [x] Phase 7: WooCommerce native COGS integration — **done and verified 2026-07-30, see Progress Log**
 - [x] §11 closeout: negative-stock setting + phantom-display-format resolution — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 9: vendors & purchase orders, strictly opt-in — **done and verified 2026-07-30, see Progress Log**
-- [ ] Phase 10: nested BOMs / sub-assemblies — **spec'd 2026-07-30 (BUILD_PLAN §5.14), not yet built** (~1 day). Sub-assemblies must be MANUFACTURED products; made-to-order components rejected; cycle detection at save.
-- [ ] Phase 8: in-app documentation & training module — **spec'd 2026-07-30 (BUILD_PLAN §5.12), not yet built** (~2–3 days). **Must be built LAST** (the developer's ordering rule) so nothing is created after it and left out of training — now queued behind Phase 10 only. Its coverage test/screenshot script must run with the §5.13 vendors feature ON.
+- [x] Phase 10: nested BOMs / sub-assemblies — **done and verified 2026-07-31, see Progress Log**
+- [ ] Phase 8: in-app documentation & training module — **spec'd 2026-07-30 (BUILD_PLAN §5.12), not yet built** (~2–3 days). **Must be built LAST** (the developer's ordering rule) so nothing is created after it and left out of training — this is now the only phase left. Its coverage test/screenshot script must run with the §5.13 vendors feature ON.
 
 Update this checklist as phases complete. Remaining open decisions are in BUILD_PLAN.md §11.
 
@@ -149,6 +149,24 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-31 — Phase 10 complete: nested BOMs / sub-assemblies, two save-time guards, real cosmetic bug found and fixed
+
+Per BUILD_PLAN.md §5.14 — mostly validation, since consumption/invalidation for a manufactured sub-assembly already worked correctly (verified with new tests rather than assumed).
+
+**Two new guards in `Bom\BomRepository::save()`, both running before the transaction opens (pure validation, no rollback needed on rejection):**
+- `reject_made_to_order_components()` — rejects any proposed line whose component resolves to `ProductMode::MADE_TO_ORDER`. Its `get_stock_quantity()` is `Stock\StorefrontStock`'s phantom-buildable filter, not a real on-hand count.
+- `reject_cycles()` — a depth-capped (10 levels) recursive walk (`reaches()`) from each proposed component through its own active BOM, checking whether the product being saved becomes reachable. Covers direct self-reference (`from_id === target_id` at depth 0) and any longer A→B→A chain through active sub-assembly recipes, with no separate code path needed for the self-reference case.
+
+Both throw a plain `\RuntimeException` (not caught/re-thrown by the surrounding transaction logic, since validation runs before it opens) with an `esc_html()`-wrapped message per this project's enforced `WordPress.Security.EscapeOutput.ExceptionNotEscaped` phpcs rule. `Rest\Api::save_bom()` gained a `try/catch` converting it to a 400 `WP_Error` (matching the exact pattern already used in `Rest\ManufactureApi`); `Bom\BomCsv`'s per-parent-group save gained the same catch, folding a rejection into its existing "this parent's whole BOM was skipped: ..." report line rather than aborting the whole import. `ProductFactory::create_from_template()`'s call site needed no change — already covered by `ManufactureApi::create_draft()`'s existing outer try/catch.
+
+**New `tests/NestedBomTest.php` (5 tests, covering §9.26–27):** the full sub-assembly chain (build a manufactured "Glittered Blank" via MO, use it as a made-to-order parent's only always-line, verify buildable = floor(sub-assembly on-hand ÷ qty), verify consuming the parent decrements the sub-assembly through the real ledgered order-consumption path, verify building/reversing the sub-assembly refreshes the parent's buildable both directions) — plus the subtle case §5.14 specifically calls out: a raw material used only *inside* the sub-assembly's own recipe does **not** move the parent's buildable, since `PhantomStock`'s invalidation reverse-index only looks at direct always-line references. Separately: direct self-reference rejected, an indirect A→B→A cycle rejected, a made-to-order component rejected, and a legitimate non-cycling sub-assembly chain still saves cleanly (proving the guards don't false-positive). Full suite now 51 tests (was 46), all passing across repeated runs; PHPCS (64 files) and PHPStan level 6 both clean; `wp i18n make-pot` clean.
+
+**A real, live-only bug found by testing, not by reasoning about the code — exactly the kind of thing this project's "verify live" standard exists to catch.** Triggering the made-to-order rejection through the actual BOM editor (not just direct PHP calls) showed the error notice as literal `&quot;Custom 24oz Tumbler&quot;...&#039;t be used...` instead of real quote characters. Root cause: the backend correctly wraps exception messages in `esc_html()` (required by the enforced phpcs rule above, and correct for a string that might get echoed into raw HTML elsewhere — e.g. `Admin\ImportExportHandlers` already does its own `esc_html()` at its actual output point for `BomCsv` errors, so escaping *there too* at the throw site would have double-encoded it). But the BOM editor's React `<Notice>` renders `err.message` as plain JSX text, which never decodes HTML entities on its own. Fixed by adding `@wordpress/html-entities`'s `decodeEntities()` at the one place `bom-editor/index.js` sets its error state, rather than removing the backend escaping (which would fix this display but break the CSV-import admin-notice path, or fail the phpcs rule). The same pattern (`err.message || String(err)`, un-decoded) exists in `manufacture`/`inventory`/`reports`/`purchasing`'s React apps too, for their own pre-existing error messages — flagged as a background task for a properly scoped follow-up rather than expanding this session.
+
+**Verified live in the dev environment, browser-only, not just via tests**: created a real manufactured sub-assembly product, gave it a real BOM, attempted a self-referencing save (rejected, correct cycle message); flagged the seeded made-to-order Custom 24oz Tumbler as a component too and tried adding it to the sub-assembly's BOM through the actual component picker — search correctly found it (proving the picker doesn't pre-filter by mode, so the guard is the only thing stopping this) — and the real Save BOM click produced the rejection notice, with real quote characters after the entity-decoding fix. Test data and the temporary component-flag fully cleaned up afterward; `wp wcbom audit` clean, `debug.log` empty.
+
+This closes out Phase 10. **Phase 8 (in-app documentation) is now the only phase left**, per the developer's standing ordering rule.
 
 ### 2026-07-31 — Phase 9 addendum #2: "Send PO" by email
 

@@ -676,9 +676,9 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 - **The gate is the feature's most important property:** `wcbom_vendors_enabled` default `'no'`; when off, nothing anywhere changes vs. today.
 - ✅ Demo: with the feature off, the admin is pixel-identical to Phase 7's; flip the setting on, create a vendor + PO for 500 blanks, place it, see "500 on order" beside the blank in the low-stock report, receive 480, watch stock and ledger update exactly, cancel the remainder.
 
-### Phase 10 — Nested BOMs / sub-assemblies (~1 day, added 2026-07-30)
+### Phase 10 — Nested BOMs / sub-assemblies (~1 day, added 2026-07-30) — ✅ **done and verified 2026-07-31, see CLAUDE.md Progress Log**
 - Per §5.14: cycle detection + made-to-order-component rejection in `BomRepository::save()`; tests proving consumption/invalidation/buildable behavior for manufactured components already works end-to-end; docs notes on shallow-buildable semantics and sub-assembly pricing.
-- ✅ Demo: build "Glittered Blank" batches via MO, put it in "Pink Glitter Tumbler"'s BOM, sell one — sub-assembly stock decrements; try to save a BOM cycle — rejected with a clear message.
+- ✅ Demo (verified): built a manufactured sub-assembly and used it as a made-to-order product's only always-line — buildable = floor(sub-assembly on-hand ÷ qty), refreshing correctly as the sub-assembly was built/reversed/consumed, while a raw material used only inside the sub-assembly's own recipe correctly did not move it; a self-referencing save, an indirect A→B→A cycle, and a made-to-order component were all rejected with clear messages through the real BOM editor UI, not just direct code calls.
 
 **Total estimate: ~13–18 focused build days** (plus ~half a day for Phase 7, ~2–3 days for Phase 9, ~1 day for Phase 10, and ~2–3 days for Phase 8, which ships last). Phases 1–4 are the core; 5–6 can trail while the store starts using it.
 

@@ -236,7 +236,19 @@ final class BomCsv {
 			);
 		}
 
-		$this->boms->save( $product_id, $items, $user_id );
+		try {
+			$this->boms->save( $product_id, $items, $user_id );
+		} catch ( \RuntimeException $e ) {
+			return array(
+				'name'  => null,
+				'error' => sprintf(
+					/* translators: 1: parent SKU, 2: rejection reason (already a full sentence) */
+					__( '"%1$s"\'s whole BOM was skipped: %2$s', 'wcbom' ),
+					$parent_sku,
+					$e->getMessage()
+				),
+			);
+		}
 
 		$product = wc_get_product( $product_id );
 

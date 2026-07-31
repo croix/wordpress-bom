@@ -160,7 +160,11 @@ final class Api {
 			);
 		}
 
-		$bom = $this->boms->save( $product_id, $clean, get_current_user_id() );
+		try {
+			$bom = $this->boms->save( $product_id, $clean, get_current_user_id() );
+		} catch ( \RuntimeException $e ) {
+			return new WP_Error( 'wcbom_bom_save_failed', $e->getMessage(), array( 'status' => 400 ) );
+		}
 
 		return new WP_REST_Response( array( 'bom' => $this->present_bom( $bom ) ) );
 	}
