@@ -137,7 +137,10 @@ The next `phpunit` run recreates all tables (`WC_Install::install()` + `Schema::
 - [x] Phase 5: reports, import/export, REST, CLI — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 6: hardening, tests, release prep — **done and verified 2026-07-30, see Progress Log** (two real bugs found and fixed along the way: transaction-nesting in StockService/BomRepository, and a Blocks-checkout stock-reservation gap in PhantomStock)
 - [x] Phase 7: WooCommerce native COGS integration — **done and verified 2026-07-30, see Progress Log**
-- [ ] Phase 8: in-app documentation & training module — **spec'd 2026-07-30 (BUILD_PLAN §5.12), not yet built** (~2–3 days). **Must be built LAST** (the developer's ordering rule) so nothing is created after it and left out of training — this is now the only phase left, so it's next whenever the developer wants it.
+- [ ] §11 closeout: negative-stock setting + phantom-display-format resolution — **decided 2026-07-30 (BUILD_PLAN §11.2/§11.3), setting not yet built** (~1–2 hours)
+- [ ] Phase 9: vendors & purchase orders, strictly opt-in — **spec'd 2026-07-30 (BUILD_PLAN §5.13), not yet built** (~2–3 days). **Hard requirement: default off, whole section invisible until enabled, manual inventory unchanged when off.**
+- [ ] Phase 10: nested BOMs / sub-assemblies — **spec'd 2026-07-30 (BUILD_PLAN §5.14), not yet built** (~1 day). Sub-assemblies must be MANUFACTURED products; made-to-order components rejected; cycle detection at save.
+- [ ] Phase 8: in-app documentation & training module — **spec'd 2026-07-30 (BUILD_PLAN §5.12), not yet built** (~2–3 days). **Must be built LAST** (the developer's ordering rule) so nothing is created after it and left out of training — now queued behind the §11 closeout and Phases 9–10. Its coverage test/screenshot script must run with the §5.13 vendors feature ON.
 
 Update this checklist as phases complete. Remaining open decisions are in BUILD_PLAN.md §11.
 
@@ -146,6 +149,17 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Scope additions before docs: vendors & POs (opt-in, §5.13/Phase 9), nested BOMs (§5.14/Phase 10), §11 items 2/3/5 resolved
+
+With Phase 7 done and only docs left, the developer asked whether any functionality was missing, recalling the vendors/purchase-orders discussion. Gap analysis: all twelve of §6's "recommend building" items were confirmed built (including pick lists, scrap, run-rate hints — grep-verified, not assumed); the only real gaps were §6's deliberate v1 exclusions. the developer pulled two of them into scope and set one hard requirement:
+
+- **Vendors & POs (§5.13, Phase 9)** — with the explicit constraint that **a merchant must be able to ignore the entire feature and keep manual inventory exactly as-is: default off, and the whole section hidden until deliberately enabled** (a `wcbom_vendors_enabled` setting; pages/routes not even registered when off). Spec highlights: three new custom tables (created unconditionally, feature-gated at UI/API — the WC-COGS gating pattern); PO lifecycle draft→ordered→partially_received→received/cancelled with a `PurchaseOrderService` owning transitions (the ManufactureService split); receiving through `StockService` + `OperationGuard` with a new `po_receive` ledger reason (VARCHAR reason column makes it migration-free); on-order quantities surfaced in low-stock report/digest/Inventory *without ever hiding real lowness*; **PO unit costs are historical records only, never written to product prices** (a dual-role component's `regular_price` is also its retail price — auto-pushing wholesale cost would corrupt the storefront); uninstall purge list extended (the `wcbom_ops` lesson); sample data deliberately excludes vendors.
+- **Nested BOMs (§5.14, Phase 10)** — verified against actual code before spec'ing: manufactured sub-assemblies as components mostly *already work* (consumption, invalidation chain — including the subtle correct case where a raw material inside the sub-assembly's recipe does NOT move the parent's buildable). The genuinely new work is two save-time guards in `BomRepository::save()`: cycle detection (depth-capped graph walk), and **rejecting made-to-order products as components** — their `get_stock_quantity()` is the phantom filter, so they'd feed fiction into buildable math and infinitely recurse on an A→B→A cycle. Buildable stays shallow (sub-assembly on-hand only; "buildable-through" explicitly out of scope).
+- **§11 item 2 resolved** — "Allow negative component stock" setting (default off) governing manual ops only; paid-order shortage behavior (§13.3) is an invariant, not a preference. **Item 3 resolved** — no plugin setting: phantom stock flows through `get_stock_quantity()`, so WC's native "Stock display format" option already controls it (to be verified live during the closeout build). **Item 5 struck** — the UI pass actually happened during Phase 6 but was never checked off (doc drift, fixed).
+- Acceptance scenarios 20–28 added to §9. **Phase 8 (docs) moves behind all of this** per the standing ordering rule, and its coverage test/screenshot script must run with the vendors feature ON or the gated surfaces would be invisible to it.
+
+Build order agreed: §11 closeout (small) → Phase 9 → Phase 10 → Phase 8. Nothing built yet this entry — specs only.
 
 ### 2026-07-30 — Phase 7 complete: WooCommerce native COGS integration, verified end-to-end
 

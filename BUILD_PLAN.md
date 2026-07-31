@@ -167,13 +167,52 @@ CREATE TABLE {prefix}wcbom_stock_ledger (
   product_id    BIGINT UNSIGNED NOT NULL,
   delta         DECIMAL(12,4) NOT NULL,     -- signed
   stock_after   DECIMAL(12,4) NULL,
-  reason        VARCHAR(32) NOT NULL,       -- order|order_restore|refund|manufacture|manufacture_reverse|manual_adjust|import|received|cycle_count (was ENUM; widened 2026-07-30 so new movement types never need a migration)
-  ref_type      VARCHAR(32) NULL,           -- 'wc_order' | 'manufacture_order' | ...
+  reason        VARCHAR(32) NOT NULL,       -- order|order_restore|refund|manufacture|manufacture_reverse|manual_adjust|import|received|cycle_count|po_receive (was ENUM; widened 2026-07-30 so new movement types never need a migration — po_receive added 2026-07-30, Phase 9)
+  ref_type      VARCHAR(32) NULL,           -- 'wc_order' | 'manufacture_order' | 'purchase_order' | ...
   ref_id        BIGINT UNSIGNED NULL,
   user_id       BIGINT UNSIGNED NULL,
   note          VARCHAR(255) NULL,
   created_at    DATETIME NOT NULL,
   KEY product_time (product_id, created_at), KEY ref (ref_type, ref_id)
+);
+
+-- Vendors (added 2026-07-30, Phase 9 §5.13 — created unconditionally, feature-gated at the UI/API layer)
+CREATE TABLE {prefix}wcbom_vendors (
+  vendor_id     BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name          VARCHAR(191) NOT NULL,
+  email         VARCHAR(191) NULL,
+  phone         VARCHAR(64) NULL,
+  website       VARCHAR(191) NULL,
+  notes         TEXT NULL,
+  is_active     TINYINT(1) NOT NULL DEFAULT 1,  -- soft archive only; POs reference vendors forever, so vendors are never hard-deleted once referenced
+  created_at    DATETIME NOT NULL,
+  KEY active (is_active)
+);
+
+-- Purchase orders (added 2026-07-30, Phase 9 §5.13)
+CREATE TABLE {prefix}wcbom_purchase_orders (
+  po_id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  vendor_id     BIGINT UNSIGNED NOT NULL,
+  status        VARCHAR(32) NOT NULL,       -- draft|ordered|partially_received|received|cancelled (VARCHAR not ENUM, same reasoning as ledger.reason)
+  reference     VARCHAR(191) NULL,          -- the vendor's own order/invoice number
+  expected_date DATE NULL,
+  notes         TEXT NULL,
+  created_by    BIGINT UNSIGNED NOT NULL,
+  created_at    DATETIME NOT NULL,
+  ordered_at    DATETIME NULL,
+  closed_at     DATETIME NULL,              -- set when received-in-full or cancelled
+  KEY vendor (vendor_id), KEY status (status)
+);
+
+-- PO lines (added 2026-07-30, Phase 9 §5.13)
+CREATE TABLE {prefix}wcbom_po_items (
+  poi_id        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  po_id         BIGINT UNSIGNED NOT NULL,
+  component_id  BIGINT UNSIGNED NOT NULL,   -- WC product/variation ID
+  qty_ordered   DECIMAL(12,4) NOT NULL,
+  qty_received  DECIMAL(12,4) NOT NULL DEFAULT 0,  -- cumulative across partial receipts
+  unit_cost     DECIMAL(12,4) NULL,         -- per-unit price paid to the vendor (historical record only — see §5.13 on why this never writes product prices)
+  KEY po (po_id), KEY component (component_id)
 );
 ```
 
@@ -447,6 +486,78 @@ the developer's "build docs last" rule is right, but it only prevents omission *
 
 ---
 
+### 5.13 Vendors & purchase orders — strictly opt-in (added 2026-07-30, Phase 9)
+
+the developer asked for vendor/PO tracking (deferred from v1 scoping, §6's out-of-scope note) with one hard requirement stated up front: **a merchant must be able to ignore this entire feature and keep managing inventory manually exactly as today — to the point that the whole section is invisible until deliberately turned on.**
+
+#### The gap this closes
+
+The plugin already says *when* to reorder (low-stock digest, §5.5's run-rate "days of stock" estimates) but has no memory of *having* reordered:
+- Low-stock alerts keep flagging components that were ordered last week — no "on order" state exists to inform them.
+- The Inventory screen's Receive action is a bare quantity + note, tied to nothing — not what was ordered, from whom, or at what price.
+- There is no record anywhere of vendor pricing history.
+
+#### Gating (the load-bearing design constraint)
+
+- New option `wcbom_vendors_enabled`, default `'no'`, exposed as an "Enable vendors & purchase orders" checkbox on the existing Settings page (the only place the feature is visible when off).
+- **When off:** the Purchasing admin page is not registered, its REST routes are not registered, reports/digest show no on-order columns, and nothing else changes — every existing manual flow (receive/count/adjust, seeding, audit) behaves identically to today. This is the same shape as WooCommerce's own COGS feature gate (§5.11): code inert, no dead UI.
+- **Tables are created unconditionally** by `Schema::install()` and data survives toggling the feature off — turning it off hides the section, never destroys it (same reasoning as the §14.6 keep-data-by-default uninstall policy). All three tables and the option join `uninstall.php`'s purge list — the exact omission that bit `wcbom_ops` in Phase 6 must not repeat.
+- Sample data (§5.7's seeder) deliberately does **not** create vendors/POs: the feature defaults off, and seeded sample rows would imply it's on.
+
+#### Data model & lifecycle
+
+Tables in §4 (`wcbom_vendors`, `wcbom_purchase_orders`, `wcbom_po_items`). Vendors are a lightweight custom-table entity (name/contact/notes/active flag) — **not** WC products or a CPT; they're never sellable, never stocked, and a CPT would buy nothing but admin-UI baggage. Soft-archive only (`is_active = 0`) once referenced by any PO, so PO history always resolves its vendor.
+
+PO status machine, enforced in a `PurchaseOrderService` (mirroring `ManufactureService`'s "repository writes columns, service owns transitions" split):
+
+- `draft` — editable lines, counts toward nothing. Deletable outright (same rule as draft MOs: nothing has moved).
+- `ordered` — the merchant has actually placed it with the vendor (`ordered_at` stamped). Lines lock (quantities/costs stop being editable; cancel-and-redraft is the correction path). Begins counting toward on-order quantities.
+- `partially_received` / `received` — receiving happens per-line ("received 480 of the 500 blanks"), cumulative into `qty_received`, `closed_at` stamped when every line is full. **Over-receipt is allowed** (vendors ship extra; refusing to record reality would be the §13 anti-pattern) — recorded as `qty_received > qty_ordered`, flagged visually, never blocking.
+- `cancelled` — allowed from draft or ordered; stops counting toward on-order. A partially-received PO can also be cancelled ("vendor can't fulfil the rest") — already-received stock stays received, remaining quantity simply stops being expected.
+
+**Receiving is a stock write, so it uses the full existing machinery:** one `StockService::adjust_many()` call per receipt (new `Ledger::REASON_PO_RECEIVE = 'po_receive'`, `ref_type 'purchase_order'`, `ref_id` = po_id — the VARCHAR reason column widened 2026-07-30 makes this migration-free), wrapped in an `OperationGuard` idempotency key exactly like MO completion (§13.6), so a double-submitted receive can never double-stock.
+
+**PO line `unit_cost` is a historical record and is never written to any product field.** Decided here so it isn't relitigated: a component's `regular_price` is this plugin's cost basis (§5.5, §5.11) *and* — for dual-role components like the blank tumbler — its live retail price. Auto-pushing a wholesale PO cost into it would corrupt storefront pricing. The never-implemented `_wcbom_component_cost` meta (§4) remains the natural future home for a true separated cost basis; explicitly out of scope here.
+
+#### Surfacing on-order awareness
+
+When (and only when) the feature is on:
+- `LowStockReport` rows and the digest email gain `on_order` = Σ(`qty_ordered` − `qty_received`) across that component's POs in `ordered`/`partially_received` status, plus the nearest `expected_date`. **Display-only**: a low component with stock on order is still listed (hiding real lowness because a PO *might* arrive would be lying to the merchant) — it just reads "500 on order, expected Aug 12" so the merchant knows not to reorder again.
+- The Component Inventory screen shows the same on-order figure per component.
+
+#### UI & API
+
+- **One new admin page, "Purchasing"** (React, same stack/patterns as Manufacturing — including capturing `add_submenu_page()`'s return for the enqueue hook suffix, the §14.8 lesson), with a PO list tab (status-filterable, statuses as the default view) and a Vendors tab (simple CRUD). One page, one gate, one menu item — not two nav entries.
+- Modals: new PO (vendor picker + component lines, same component-picker used by the BOM editor), receive (per-line qty inputs prefilled with outstanding amounts), cancel.
+- **REST** (`wcbom/v1`): `/vendors` CRUD, `/purchase-orders` CRUD, `/purchase-orders/<id>/place`, `/receive`, `/cancel`. Registered only when the feature is on; same `manage_woocommerce` + nonce gate as everything else.
+- **No new CLI subcommands in v1** of this feature (nothing here needs scripting yet); `wp wcbom audit` gains one informational check — PO lines referencing components that no longer exist (same drift class as the orphaned-BOM check queued in Phase 6).
+- **Phase 8 note:** the docs coverage test must run with the feature enabled, or the Purchasing page/routes would be invisible to it and the Guide could ship without covering them.
+
+**Estimate: ~2–3 days.** Structurally a sibling of Manufacture Orders (tables + repository + service + React page + REST), reusing StockService/OperationGuard/component-picker wholesale.
+
+### 5.14 Nested BOMs / sub-assemblies (added 2026-07-30, Phase 10)
+
+Deferred at scoping (§6's out-of-scope note); the developer pulled it in 2026-07-30. The use case: batch-build an intermediate good (e.g. "glittered blank") via a manufacture order, then use *that* as a component in other products' BOMs.
+
+#### The one hard rule: sub-assemblies must be MANUFACTURED (or standard) products — never MADE_TO_ORDER
+
+Verified against the actual code before writing this spec: `PhantomStock::compute()` reads each component's stock via `WC_Product::get_stock_quantity()`. For a MANUFACTURED component that's its real, physical count — correct by construction. But a MADE_TO_ORDER product's `get_stock_quantity()` is *filtered* (`StorefrontStock`) to return its own phantom buildable number, so allowing one as a component would (a) feed a derived fiction into another product's buildable math, silently double-counting the shared raw components both recipes draw from, and (b) **recurse infinitely at compute time on any A→B→A cycle** — compute(A) → get_stock_quantity(B) → filter → compute(B) → get_stock_quantity(A) → …. So made-to-order products are rejected as BOM components at save time, with a clear message. Physically-stocked sub-assemblies only.
+
+#### What already works, verified rather than rebuilt (this phase is mostly validation + guards)
+
+- **Consumption:** an MO completing (or an order consuming) a BOM whose line points at a manufactured sub-assembly already decrements its real stock through the row-locked `StockService` path — a component is just a product ID; nothing in the consumption path cares what mode it is.
+- **Invalidation chain is already correct, including the subtle case:** sub-assembly B's stock changes only via MO complete/reverse or manual edit — both already fire the triggers `PhantomStock` listens to, so parent A's buildable refreshes. And a *raw material* C (used only in B's recipe) changing does **not** invalidate A — correctly, because A's buildable depends only on B's real on-hand stock, which didn't move.
+- **Deletion guard, ledger, reports:** all keyed on component_id, mode-agnostic.
+
+#### What's actually new
+
+1. **Cycle detection in `BomRepository::save()`** — walk the active-BOM component graph from each proposed component; reject the save if the product being saved is reachable (covers direct self-reference and any longer cycle). Depth-capped walk (10 levels) as belt-and-braces; with made-to-order components banned, cycles among manufactured BOMs are the only cycle class left, and they'd corrupt MO planning even though they can't infinitely recurse at compute time.
+2. **Mode validation in `BomRepository::save()`** — reject any component whose effective mode is `made_to_order` (rationale above, enforced at the single choke point every save path already goes through: REST, CSV import, seeder, tests).
+3. **Buildable semantics documented, not deepened:** a made-to-order product with a manufactured sub-assembly line shows buildable = floor(sub-assembly *on-hand* ÷ qty). "Buildable-through" (counting what *could* be built from raw materials backing the sub-assembly) is explicitly out of scope — the shallow number is the true "sellable right now" count, and the deep one requires the recursion/double-count machinery this section exists to avoid.
+4. **Costing note for docs:** a sub-assembly's cost contribution (margin report, §5.11 COGS) is its `regular_price`, same as any component — so merchants must price sub-assemblies even if hidden/unsellable, or downstream costs silently read 0. The *better* number for a built batch already exists (MO snapshot unit costs) but wiring it in per-component is out of scope; documented as a known approximation.
+
+**Estimate: ~1 day**, most of it tests proving the "already works" claims above plus the two save-time guards.
+
 ## 6. Suggested features you didn't mention (recommend building)
 
 1. **Stock ledger / audit trail** (§2.5) — without it, "why is my blank count wrong?" is unanswerable. *Build in phase 1.*
@@ -464,8 +575,9 @@ the developer's "build docs last" rule is right, but it only prevents omission *
 
 ### Deliberately out of scope for v1 (note for later)
 
-- **Nested BOMs / sub-assemblies** (a manufactured item used as a component in another BOM). Schema supports it (components are just products); the phantom-stock recursion and cycle detection are the work. Design doesn't block it — defer.
-- Multi-warehouse/location stock; supplier purchase orders (receiving *is* in scope as of 2026-07-30 — §5.7's Inventory screen — but PO tracking against suppliers is not); barcode scanning; serial/lot tracking.
+- ~~**Nested BOMs / sub-assemblies**~~ **Pulled into scope 2026-07-30** — spec'd as §5.14 / Phase 10.
+- ~~supplier purchase orders~~ **Pulled into scope 2026-07-30** — spec'd as §5.13 / Phase 9, strictly opt-in (default off, invisible until enabled).
+- Multi-warehouse/location stock; barcode scanning; serial/lot tracking — still out.
 
 ---
 
@@ -540,10 +652,19 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 
 ### Phase 8 — In-app documentation & training module (~2–3 days, added 2026-07-30) — **must be built LAST**
 - Per §5.12: `Admin\GuidePage` (plain PHP, structured-array content), WP-native contextual help tabs on all five screens, generated screenshots via a dev-only Playwright script (`npm run docs:screenshots`), a coverage test that fails when a page/route/CLI command has no doc section, and third-party companion-plugin videos **linked, never embedded**.
-- **Ordering rule (the developer's, 2026-07-30):** documentation is built last so nothing is created after it and left out of training. Currently that means after Phase 7 (COGS); if further features are spec'd first, this phase moves behind them again.
+- **Ordering rule (the developer's, 2026-07-30):** documentation is built last so nothing is created after it and left out of training. As of the 2026-07-30 scope additions, that means after Phases 9 and 10. The coverage test and screenshot script must run **with the §5.13 vendors feature enabled**, or the gated Purchasing surfaces would be invisible to both.
 - ✅ Demo: a new user follows the Guide alone from fresh install → working made-to-order product → completed manufacture order → stock receipt, with no questions; re-running the screenshot generator twice produces no git diff.
 
-**Total estimate: ~13–18 focused build days** (plus ~half a day for Phase 7 and ~2–3 days for Phase 8). Phases 1–4 are the core; 5–6 can trail while the store starts using it.
+### Phase 9 — Vendors & purchase orders, strictly opt-in (~2–3 days, added 2026-07-30)
+- Per §5.13: three new tables (+ uninstall purge list), `VendorRepository`/`PurchaseOrderRepository`/`PurchaseOrderService`, receive-against-PO through StockService + OperationGuard (`po_receive` ledger reason), one gated "Purchasing" admin page (React; PO list + Vendors tabs), gated REST routes, on-order quantities in the low-stock report/digest/Inventory screen, one new audit check.
+- **The gate is the feature's most important property:** `wcbom_vendors_enabled` default `'no'`; when off, nothing anywhere changes vs. today.
+- ✅ Demo: with the feature off, the admin is pixel-identical to Phase 7's; flip the setting on, create a vendor + PO for 500 blanks, place it, see "500 on order" beside the blank in the low-stock report, receive 480, watch stock and ledger update exactly, cancel the remainder.
+
+### Phase 10 — Nested BOMs / sub-assemblies (~1 day, added 2026-07-30)
+- Per §5.14: cycle detection + made-to-order-component rejection in `BomRepository::save()`; tests proving consumption/invalidation/buildable behavior for manufactured components already works end-to-end; docs notes on shallow-buildable semantics and sub-assembly pricing.
+- ✅ Demo: build "Glittered Blank" batches via MO, put it in "Pink Glitter Tumbler"'s BOM, sell one — sub-assembly stock decrements; try to save a BOM cycle — rejected with a clear message.
+
+**Total estimate: ~13–18 focused build days** (plus ~half a day for Phase 7, ~2–3 days for Phase 9, ~1 day for Phase 10, and ~2–3 days for Phase 8, which ships last). Phases 1–4 are the core; 5–6 can trail while the store starts using it.
 
 ---
 
@@ -565,6 +686,24 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 
 *Phase 7 (COGS integration, §5.11) adds scenarios 14–19 — listed in that section rather than repeated here.*
 
+Phase 9 (vendors & POs, §5.13) adds:
+
+20. Feature **off** (default): no Purchasing page, no vendor/PO REST routes, and every manual inventory flow behaves identically to pre-Phase-9 — the no-change guarantee.
+21. Full PO lifecycle: draft → placed → partial receive (480 of 500) → receive remainder → `received`; component stock and ledger rows (`po_receive`, ref `purchase_order`/po_id) exact at each step; `qty_received` cumulative per line.
+22. Receiving is idempotent: replaying the same receive operation key doesn't double-stock (OperationGuard, §13.6 pattern).
+23. Low-stock report/digest show on-order quantity + nearest expected date for components on open POs — and still list the component (on-order never hides real lowness).
+24. Cancelling a PO (including a partially-received one) stops the outstanding quantity counting toward on-order; already-received stock is untouched.
+25. A draft PO deletes outright; a placed PO cannot be deleted, only cancelled.
+
+Phase 10 (nested BOMs, §5.14) adds:
+
+26. An MO for a parent product consumes a manufactured sub-assembly's real stock through the ledgered path; a made-to-order parent's buildable = floor(sub-assembly on-hand ÷ qty), refreshing when the sub-assembly is built/reversed — and a raw material used only *inside* the sub-assembly's recipe does not move the parent's buildable.
+27. BOM save rejects: a direct self-reference, an A→B→A cycle through active BOMs, and any made-to-order product as a component — each with a clear error.
+
+§11 closeout (2026-07-30) adds:
+
+28. With "Allow negative component stock" **off** (default), a manual adjustment below zero is blocked without the explicit override; with it **on**, the same adjustment proceeds and ledgers the exact negative. Order consumption goes negative (flagged) in both states — §13.3 is not a setting.
+
 ---
 
 ## 10. Decisions already made (don't re-litigate at build time)
@@ -584,10 +723,10 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 ## 11. Open decisions (resolve during build)
 
 1. ~~Which product options/add-ons plugin~~ **DECIDED 2026-07-29** — see §10. If visual live preview is later needed for conversion, trial Fancy Product Designer (~$99 one-time at fancyproductdesigner.com — the $59 CodeCanyon version is maintenance-only; Lumise ~$69 one-time but development has slowed; Zakeke/Customily/Kickflip are subscriptions — excluded). Build in-house only if FPD falls short, and then as a flat wrap-strip fabric.js canvas (production-usable export), not a curved-surface 3D preview.
-2. Whether negative component stock is ever allowed (setting; default **off**).
-3. Whether phantom stock shows an exact number or just in/out-of-stock to customers (setting; default: show number, respecting WC's "stock display format" option).
+2. ~~Whether negative component stock is ever allowed~~ **RESOLVED 2026-07-30** — "Allow negative component stock" checkbox on the Settings page, default **off**. Scope is deliberately narrow: it governs only whether *manual* operations (Inventory adjustments, MO completion) block on insufficient stock or proceed without the explicit per-operation override. Paid-order consumption is **not** governed by it — that always proceeds negative with the `[SHORTAGE]` flag, because §13.3 (never fatal a paid checkout) is a design invariant, not a preference.
+3. ~~Whether phantom stock shows an exact number or just in/out-of-stock~~ **RESOLVED 2026-07-30** — no plugin setting. `StorefrontStock` exposes the buildable number through the standard `get_stock_quantity()` filter, so WooCommerce's own **Products → Inventory → "Stock display format"** option already fully controls presentation (exact number / only-when-low / never) for phantom stock exactly as for real stock. Verified live rather than assumed — see CLAUDE.md Progress Log. A duplicate plugin-level setting could only disagree with the WC one.
 4. Hosting/deploy target for the store itself (plugin is host-agnostic; note Sliquid's other apps are Cloudflare — a WP store won't be, but the REST API keeps integration options open).
-5. **UI/cosmetic pass across every admin page this plugin adds** (added 2026-07-30, the developer's request) — Inventory, Manufacturing, BOM editor tab, Reports, Endpoints, Settings section. Everything so far has been built and verified for *correctness* (real data, real REST calls, live browser checks) but not reviewed for visual polish/consistency as a deliberate pass. Do this once the admin surface stops changing shape — Phase 6 (hardening/release prep) is the natural point, so it isn't redone after every subsequent phase adds another screen.
+5. ~~**UI/cosmetic pass across every admin page this plugin adds**~~ **DONE 2026-07-30 during Phase 6** (see CLAUDE.md Progress Log: modal spacing fixes, Inventory retitle, cosmetic sweep) — struck through 2026-07-30 when the drift was noticed. Note: Phase 9's new Purchasing page should get the same treatment as part of its own build, not as a re-run of the global pass.
 
 ## 12. Dependency risk register & upgrade strategy (added 2026-07-30)
 
