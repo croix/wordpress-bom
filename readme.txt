@@ -6,7 +6,7 @@ Tested up to: 7.0
 Requires PHP: 8.1
 WC requires at least: 8.5
 WC tested up to: 10.9
-Stable tag: 0.1.0
+Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -28,7 +28,8 @@ WooCommerce BOM & Stock Manager adds recipe-based inventory to any WooCommerce s
 
 **Also included:**
 
-* A dedicated "BOM & Stock" admin menu: Component Inventory (receive / cycle count / adjust, all in one screen), Manufacturing (create, complete, and reverse manufacture orders), Reports (buildable stock, low stock, margin, component usage, full ledger), an Endpoints reference page, and Settings.
+* A dedicated "BOM & Stock" admin menu: Component Inventory (receive / cycle count / adjust, all in one screen), Manufacturing (create, complete, and reverse manufacture orders), Reports (buildable stock, low stock, margin, component usage, full ledger), an in-app Guide with screenshots for every screen, an Endpoints reference page, and Settings.
+* Nested BOMs — a manufactured batch can itself be used as a component ("sub-assembly") in another product's recipe.
 * CSV import/export for BOMs, keyed by SKU.
 * A REST API and WP-CLI commands (`wp wcbom seed`, `wp wcbom audit`, `wp wcbom recompute`, `wp wcbom import`) for scripting and recovery.
 * A low-stock digest email, sent on a schedule you control.
@@ -84,10 +85,10 @@ No. It's off by default, and while it's off there's no Purchasing menu item and 
 
 == Changelog ==
 
-= 0.1.0 =
-* Initial release: BOM editor, order consumption/restoration, buildable stock, Component Inventory screen, Manufacture Orders, reports, CSV import/export, REST API, WP-CLI commands, low-stock digest, BOM-derived weight/surcharges, HPOS compatibility, WooCommerce Cost of Goods Sold integration, optional vendors & purchase orders.
+= 1.0.0 =
+* Initial public release: BOM editor, order consumption/restoration, buildable stock, Component Inventory screen, Manufacture Orders, nested BOMs (manufactured sub-assemblies usable as components in other recipes), reports, CSV import/export, REST API, WP-CLI commands, low-stock digest, BOM-derived weight/surcharges, HPOS compatibility, WooCommerce Cost of Goods Sold integration, optional vendors & purchase orders, and a full in-app documentation/training Guide with contextual help on every screen.
 
 == Upgrade Notice ==
 
-= 0.1.0 =
-Initial release.
+= 1.0.0 =
+Initial public release.

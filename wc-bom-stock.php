@@ -3,7 +3,7 @@
  * Plugin Name:       WooCommerce BOM & Stock Manager
  * Plugin URI:        https://github.com/croix/wordpress-bom
  * Description:       Bill-of-materials and component-level stock management for WooCommerce — made-to-order component consumption, manufacture orders, and a full stock ledger.
- * Version:           0.1.0
+ * Version:           1.0.0
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Requires Plugins:  woocommerce
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'WCBOM_VERSION', '0.1.0' );
+define( 'WCBOM_VERSION', '1.0.0' );
 define( 'WCBOM_PLUGIN_FILE', __FILE__ );
 define( 'WCBOM_PLUGIN_DIR', __DIR__ );
 // Keep in sync with the "WC requires at least" header above.
