@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace WCBOM\Admin;
 
 use WC_Admin_Settings;
+use WCBOM\Purchasing\VendorsFeature;
 use WCBOM\Reports\LowStockDigest;
 use WCBOM\Stock\NegativeStockPolicy;
 
@@ -27,7 +28,8 @@ defined( 'ABSPATH' ) || exit;
  * (that's the tab system's job normally), so this class adds its own.
  *
  * Currently: the uninstall data policy (BUILD_PLAN.md §14.6), the
- * negative-stock policy (§11.2), and the low-stock digest (§5.5, Phase 5).
+ * negative-stock policy (§11.2), the low-stock digest (§5.5, Phase 5), and
+ * the vendors & purchase orders feature gate (§5.13, Phase 9).
  */
 final class SettingsPage {
 
@@ -118,6 +120,14 @@ final class SettingsPage {
 				'id'       => LowStockDigest::OPTION_EMAIL,
 				'type'     => 'email',
 				'default'  => '',
+			),
+			array(
+				'title'    => __( 'Enable vendors & purchase orders', 'wcbom' ),
+				'desc'     => __( 'Add a Purchasing section for tracking vendors and purchase orders against components.', 'wcbom' ),
+				'desc_tip' => __( 'Off by default. Leave unchecked to keep managing inventory manually exactly as before — with this off, no Purchasing menu item exists and no related fields appear anywhere else in the plugin. Turning it on doesn\'t seed any sample vendors or orders; the section starts empty.', 'wcbom' ),
+				'id'       => VendorsFeature::OPTION,
+				'type'     => 'checkbox',
+				'default'  => 'no',
 			),
 			array(
 				'type' => 'sectionend',

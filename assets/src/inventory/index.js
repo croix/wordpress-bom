@@ -75,6 +75,11 @@ function InventoryApp( { restNamespace } ) {
 
 	const selectedComponents = components.filter( ( c ) => selected[ c.id ] );
 
+	// Present only when VendorsFeature (Phase 9) is enabled — the API
+	// response omits `on_order` entirely on every row when it's off, so
+	// this table renders identically to before that feature existed.
+	const hasOnOrder = components.some( ( c ) => undefined !== c.on_order );
+
 	function openReceive() {
 		if ( selectedComponents.length === 0 ) {
 			return;
@@ -163,6 +168,7 @@ function InventoryApp( { restNamespace } ) {
 								<th>{ __( 'Component', 'wcbom' ) }</th>
 								<th>{ __( 'SKU', 'wcbom' ) }</th>
 								<th>{ __( 'On hand', 'wcbom' ) }</th>
+								{ hasOnOrder && <th>{ __( 'On order', 'wcbom' ) }</th> }
 								<th>{ __( 'Used in', 'wcbom' ) }</th>
 								<th>{ __( 'Last movement', 'wcbom' ) }</th>
 								<th></th>
@@ -183,6 +189,13 @@ function InventoryApp( { restNamespace } ) {
 									<td>
 										{ c.stock } { c.unit }
 									</td>
+									{ hasOnOrder && (
+										<td>
+											{ undefined !== c.on_order
+												? `${ formatNumber( c.on_order ) } ${ c.unit }${ c.on_order_expected ? ` (${ c.on_order_expected })` : '' }`
+												: '—' }
+										</td>
+									) }
 									<td>{ sprintf(
 										/* translators: %d: number of active BOMs this component is used in */
 										__( '%d BOM(s)', 'wcbom' ),

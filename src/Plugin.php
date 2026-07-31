@@ -16,6 +16,7 @@ use WCBOM\Admin\InventoryPage;
 use WCBOM\Admin\ManufacturePage;
 use WCBOM\Admin\PluginMenu;
 use WCBOM\Admin\ProductBomMetabox;
+use WCBOM\Admin\PurchasingPage;
 use WCBOM\Admin\RecommendedPlugins;
 use WCBOM\Admin\ReportsPage;
 use WCBOM\Admin\SettingsPage;
@@ -31,6 +32,9 @@ use WCBOM\Manufacture\ManufactureService;
 use WCBOM\Manufacture\ProductFactory;
 use WCBOM\Orders\OrderSync;
 use WCBOM\Orders\RefundHandler;
+use WCBOM\Purchasing\PurchaseOrderRepository;
+use WCBOM\Purchasing\PurchaseOrderService;
+use WCBOM\Purchasing\VendorRepository;
 use WCBOM\Reports\BomCost;
 use WCBOM\Reports\BuildableReport;
 use WCBOM\Reports\ComponentUsageReport;
@@ -41,6 +45,7 @@ use WCBOM\Rest\Api;
 use WCBOM\Rest\InventoryApi;
 use WCBOM\Rest\LedgerApi;
 use WCBOM\Rest\ManufactureApi;
+use WCBOM\Rest\PurchasingApi;
 use WCBOM\Rest\ReportsApi;
 use WCBOM\Rest\SampleDataApi;
 use WCBOM\Stock\Ledger;
@@ -97,9 +102,13 @@ final class Plugin {
 		$factory    = new ProductFactory( $boms, $matcher );
 		$mo_service = new ManufactureService( $mo_orders, $boms, $stock, $guard, $factory );
 
+		$vendors    = new VendorRepository();
+		$po_orders  = new PurchaseOrderRepository();
+		$po_service = new PurchaseOrderService( $po_orders, $stock, $guard );
+
 		$buildable_report = new BuildableReport( $boms );
 		$usage_report     = new ComponentUsageReport( $boms, $ledger );
-		$low_stock_report = new LowStockReport( $boms );
+		$low_stock_report = new LowStockReport( $boms, $po_orders );
 		$bom_cost         = new BomCost();
 		$margin_report    = new MarginReport( $boms, $matcher, $bom_cost );
 		$bom_csv          = new BomCsv( $boms );
@@ -116,6 +125,7 @@ final class Plugin {
 		( new PluginMenu() )->register();
 		( new InventoryPage() )->register();
 		( new ManufacturePage() )->register();
+		( new PurchasingPage() )->register();
 		( new ReportsPage() )->register();
 		( new EndpointsPage() )->register();
 		( new ImportExportHandlers( $bom_csv, $ledger ) )->register();
@@ -126,11 +136,12 @@ final class Plugin {
 
 		add_action(
 			'rest_api_init',
-			static function () use ( $boms, $stock, $guard, $mo_orders, $mo_service, $ledger, $buildable_report, $usage_report, $low_stock_report, $margin_report ) {
+			static function () use ( $boms, $stock, $guard, $mo_orders, $mo_service, $vendors, $po_orders, $po_service, $ledger, $buildable_report, $usage_report, $low_stock_report, $margin_report ) {
 				( new Api( $boms ) )->register_routes();
-				( new InventoryApi( $stock, $boms, $guard ) )->register_routes();
+				( new InventoryApi( $stock, $boms, $guard, $po_orders ) )->register_routes();
 				( new SampleDataApi( new SampleData() ) )->register_routes();
 				( new ManufactureApi( $mo_service, $mo_orders, $boms ) )->register_routes();
+				( new PurchasingApi( $po_service, $po_orders, $vendors ) )->register_routes();
 				( new ReportsApi( $buildable_report, $usage_report, $low_stock_report, $margin_report ) )->register_routes();
 				( new LedgerApi( $ledger ) )->register_routes();
 			}

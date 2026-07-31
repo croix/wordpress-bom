@@ -18,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Schema {
 
-	public const DB_VERSION = '0.4.0';
+	public const DB_VERSION = '0.5.0';
 
 	private const OPTION_KEY = 'wcbom_db_version';
 
@@ -127,6 +127,47 @@ CREATE TABLE {$prefix}wcbom_ops (
   summary VARCHAR(255) NULL,
   PRIMARY KEY  (op_key),
   KEY created (created_at)
+) {$charset_collate};
+
+CREATE TABLE {$prefix}wcbom_vendors (
+  vendor_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(191) NOT NULL,
+  email VARCHAR(191) NULL,
+  phone VARCHAR(64) NULL,
+  website VARCHAR(191) NULL,
+  notes TEXT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL,
+  PRIMARY KEY  (vendor_id),
+  KEY active (is_active)
+) {$charset_collate};
+
+CREATE TABLE {$prefix}wcbom_purchase_orders (
+  po_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  vendor_id BIGINT UNSIGNED NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  reference VARCHAR(191) NULL,
+  expected_date DATE NULL,
+  notes TEXT NULL,
+  created_by BIGINT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL,
+  ordered_at DATETIME NULL,
+  closed_at DATETIME NULL,
+  PRIMARY KEY  (po_id),
+  KEY vendor (vendor_id),
+  KEY status (status)
+) {$charset_collate};
+
+CREATE TABLE {$prefix}wcbom_po_items (
+  poi_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  po_id BIGINT UNSIGNED NOT NULL,
+  component_id BIGINT UNSIGNED NOT NULL,
+  qty_ordered DECIMAL(12,4) NOT NULL,
+  qty_received DECIMAL(12,4) NOT NULL DEFAULT 0,
+  unit_cost DECIMAL(12,4) NULL,
+  PRIMARY KEY  (poi_id),
+  KEY po (po_id),
+  KEY component (component_id)
 ) {$charset_collate};
 ";
 

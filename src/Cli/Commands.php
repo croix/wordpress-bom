@@ -18,6 +18,8 @@ use WCBOM\Install\SampleData;
 use WCBOM\Manufacture\ManufactureOrder;
 use WCBOM\Manufacture\ManufactureRepository;
 use WCBOM\Orders\OrderSync;
+use WCBOM\Purchasing\PurchaseOrderRepository;
+use WCBOM\Purchasing\VendorsFeature;
 use WCBOM\Stock\Ledger;
 use WCBOM\Stock\PhantomStock;
 use WP_CLI;
@@ -124,6 +126,7 @@ final class Commands {
 		$issues += $this->audit_missing_snapshots( $fix );
 		$issues += $this->audit_stuck_drafts();
 		$issues += $this->audit_stale_ops();
+		$issues += $this->audit_orphaned_po_items();
 
 		if ( $issues > 0 ) {
 			WP_CLI::warning( sprintf( 'Audit complete: %d finding(s) above — most are informational, see each section.', $issues ) );
@@ -354,6 +357,37 @@ final class Commands {
 		WP_CLI::log( "  {$count} claimed operation key(s) older than 1 hour — informational, the retry path already handles these." );
 
 		return 0; // Never counted toward the "found issues" total — purely informational by design.
+	}
+
+	/**
+	 * Check (e): purchase-order line items referencing a component
+	 * product/variation that no longer exists — the same drift class as
+	 * the orphaned-BOM check queued in the Phase 6 Progress Log. Silent
+	 * (no section printed, no count) when VendorsFeature is disabled, so
+	 * `wp wcbom audit`'s output stays identical to before Phase 9 for a
+	 * merchant who's never turned the feature on (BUILD_PLAN.md §5.13/§9.20).
+	 */
+	private function audit_orphaned_po_items(): int {
+		if ( ! VendorsFeature::enabled() ) {
+			return 0;
+		}
+
+		WP_CLI::log( '' );
+		WP_CLI::log( '--- (e) Purchase-order lines referencing a deleted component ---' );
+
+		$orphans = ( new PurchaseOrderRepository() )->orphaned_items();
+
+		if ( array() === $orphans ) {
+			WP_CLI::log( '  No orphaned PO line items found.' );
+
+			return 0;
+		}
+
+		foreach ( $orphans as $orphan ) {
+			WP_CLI::log( "  PO #{$orphan['po_id']} line #{$orphan['poi_id']}: component #{$orphan['component_id']} no longer exists." );
+		}
+
+		return count( $orphans );
 	}
 
 	/**

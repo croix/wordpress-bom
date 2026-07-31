@@ -655,7 +655,7 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 - **Ordering rule (the developer's, 2026-07-30):** documentation is built last so nothing is created after it and left out of training. As of the 2026-07-30 scope additions, that means after Phases 9 and 10. The coverage test and screenshot script must run **with the §5.13 vendors feature enabled**, or the gated Purchasing surfaces would be invisible to both.
 - ✅ Demo: a new user follows the Guide alone from fresh install → working made-to-order product → completed manufacture order → stock receipt, with no questions; re-running the screenshot generator twice produces no git diff.
 
-### Phase 9 — Vendors & purchase orders, strictly opt-in (~2–3 days, added 2026-07-30)
+### Phase 9 — Vendors & purchase orders, strictly opt-in (~2–3 days, added 2026-07-30) — ✅ **done and verified 2026-07-30, see CLAUDE.md Progress Log**
 - Per §5.13: three new tables (+ uninstall purge list), `VendorRepository`/`PurchaseOrderRepository`/`PurchaseOrderService`, receive-against-PO through StockService + OperationGuard (`po_receive` ledger reason), one gated "Purchasing" admin page (React; PO list + Vendors tabs), gated REST routes, on-order quantities in the low-stock report/digest/Inventory screen, one new audit check.
 - **The gate is the feature's most important property:** `wcbom_vendors_enabled` default `'no'`; when off, nothing anywhere changes vs. today.
 - ✅ Demo: with the feature off, the admin is pixel-identical to Phase 7's; flip the setting on, create a vendor + PO for 500 blanks, place it, see "500 on order" beside the blank in the low-stock report, receive 480, watch stock and ledger update exactly, cancel the remainder.

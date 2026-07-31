@@ -78,7 +78,7 @@ final class LowStockDigest {
 
 		$lines = array();
 		foreach ( $rows as $row ) {
-			$lines[] = sprintf(
+			$line = sprintf(
 				/* translators: 1: component name, 2: current stock, 3: threshold, 4: number of products blocked */
 				__( '%1$s: %2$s on hand (threshold %3$s) — blocks %4$d product(s)', 'wcbom' ),
 				$row['name'],
@@ -86,6 +86,26 @@ final class LowStockDigest {
 				rtrim( rtrim( number_format( $row['threshold'], 4 ), '0' ), '.' ),
 				$row['blocks_products']
 			);
+
+			// Present only when VendorsFeature is enabled (§5.13) — never
+			// hides the row, just adds context so the merchant knows not to
+			// reorder something already on its way.
+			if ( isset( $row['on_order'] ) ) {
+				$line .= ' — ' . ( null !== $row['on_order_expected']
+					? sprintf(
+						/* translators: 1: quantity on order, 2: expected delivery date */
+						__( '%1$s on order, expected %2$s', 'wcbom' ),
+						rtrim( rtrim( number_format( $row['on_order'], 4 ), '0' ), '.' ),
+						$row['on_order_expected']
+					)
+					: sprintf(
+						/* translators: %s: quantity on order */
+						__( '%s on order', 'wcbom' ),
+						rtrim( rtrim( number_format( $row['on_order'], 4 ), '0' ), '.' )
+					) );
+			}
+
+			$lines[] = $line;
 		}
 
 		wp_mail(

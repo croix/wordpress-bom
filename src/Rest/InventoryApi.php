@@ -11,6 +11,8 @@ namespace WCBOM\Rest;
 
 use WC_Product;
 use WCBOM\Bom\BomRepository;
+use WCBOM\Purchasing\PurchaseOrderRepository;
+use WCBOM\Purchasing\VendorsFeature;
 use WCBOM\Stock\InsufficientStockException;
 use WCBOM\Stock\Ledger;
 use WCBOM\Stock\NegativeStockPolicy;
@@ -38,14 +40,16 @@ final class InventoryApi {
 	/**
 	 * Constructs the controller.
 	 *
-	 * @param StockService   $stock  The single stock-mutation path.
-	 * @param BomRepository  $boms   Used for the used-in-N-BOMs column.
-	 * @param OperationGuard $guard Idempotency-key claim.
+	 * @param StockService            $stock           The single stock-mutation path.
+	 * @param BomRepository           $boms            Used for the used-in-N-BOMs column.
+	 * @param OperationGuard          $guard           Idempotency-key claim.
+	 * @param PurchaseOrderRepository $purchase_orders On-order column, read only when VendorsFeature is enabled.
 	 */
 	public function __construct(
 		private readonly StockService $stock,
 		private readonly BomRepository $boms,
-		private readonly OperationGuard $guard
+		private readonly OperationGuard $guard,
+		private readonly PurchaseOrderRepository $purchase_orders
 	) {}
 
 	/**
@@ -111,9 +115,10 @@ final class InventoryApi {
 			);
 		}
 
-		$query   = new WP_Query( $args );
-		$ledger  = new Ledger();
-		$results = array();
+		$query    = new WP_Query( $args );
+		$ledger   = new Ledger();
+		$on_order = VendorsFeature::enabled() ? $this->purchase_orders->on_order_by_component() : array();
+		$results  = array();
 
 		foreach ( $query->posts as $post ) {
 			$product = wc_get_product( $post->ID );
@@ -124,7 +129,7 @@ final class InventoryApi {
 			$recent        = $ledger->for_product( $product->get_id(), 1 );
 			$last_movement = $recent[0] ?? null;
 			$unit          = get_post_meta( $product->get_id(), '_wcbom_unit', true );
-			$results[]     = array(
+			$row           = array(
 				'id'            => $product->get_id(),
 				'name'          => $product->get_name(),
 				'sku'           => $product->get_sku(),
@@ -137,6 +142,13 @@ final class InventoryApi {
 					'created_at' => $last_movement['created_at'],
 				) : null,
 			);
+
+			if ( isset( $on_order[ $product->get_id() ] ) ) {
+				$row['on_order']          = $on_order[ $product->get_id() ]['qty'];
+				$row['on_order_expected'] = $on_order[ $product->get_id() ]['expected_date'];
+			}
+
+			$results[] = $row;
 		}
 
 		return new WP_REST_Response(

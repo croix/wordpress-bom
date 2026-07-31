@@ -78,10 +78,14 @@ Yes, and with both the block-based and the classic shortcode checkout.
 
 Yes. Enable WooCommerce's Cost of Goods Sold feature and check "Cost of Goods Sold from BOM" on a product's Bill of Materials tab, and its BOM cost feeds WooCommerce's own Analytics automatically — a made-to-order product prices from its live component costs (per variation, if the option chosen affects the recipe), and a manufactured product prices from what its most recent batch actually cost to build. Nothing is written to the product's own Cost field; leave the box unchecked to type a cost by hand instead.
 
+= Do I have to use the vendors & purchase orders feature? =
+
+No. It's off by default, and while it's off there's no Purchasing menu item and nothing else in the plugin changes — keep receiving/counting/adjusting stock manually exactly as before. Turn it on (BOM & Stock → Settings) whenever you want to track who you order components from and what's on its way; turning it back off hides the section again without losing any of its data.
+
 == Changelog ==
 
 = 0.1.0 =
-* Initial release: BOM editor, order consumption/restoration, buildable stock, Component Inventory screen, Manufacture Orders, reports, CSV import/export, REST API, WP-CLI commands, low-stock digest, BOM-derived weight/surcharges, HPOS compatibility, WooCommerce Cost of Goods Sold integration.
+* Initial release: BOM editor, order consumption/restoration, buildable stock, Component Inventory screen, Manufacture Orders, reports, CSV import/export, REST API, WP-CLI commands, low-stock digest, BOM-derived weight/surcharges, HPOS compatibility, WooCommerce Cost of Goods Sold integration, optional vendors & purchase orders.
 
 == Upgrade Notice ==
 

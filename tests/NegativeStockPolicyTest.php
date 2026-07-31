@@ -11,6 +11,7 @@
 declare(strict_types=1);
 
 use WCBOM\Bom\BomRepository;
+use WCBOM\Purchasing\PurchaseOrderRepository;
 use WCBOM\Rest\InventoryApi;
 use WCBOM\Stock\InsufficientStockException;
 use WCBOM\Stock\Ledger;
@@ -88,7 +89,7 @@ final class NegativeStockPolicyTest extends WCBOM_UnitTestCase {
 		delete_option( NegativeStockPolicy::OPTION );
 
 		$blank = $this->create_component( 'Blank', 5 );
-		$api   = new InventoryApi( new StockService( new Ledger() ), new BomRepository(), new OperationGuard() );
+		$api   = new InventoryApi( new StockService( new Ledger() ), new BomRepository(), new OperationGuard(), new PurchaseOrderRepository() );
 
 		$blocked = $api->apply_adjust( $this->adjust_request( $blank, -10.0, 'off by default' ) );
 		$this->assertInstanceOf( WP_Error::class, $blocked );
