@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace WCBOM\Admin;
 
+use WCBOM\Admin\Guide\ContextualHelp;
 use WCBOM\Purchasing\VendorsFeature;
 
 defined( 'ABSPATH' ) || exit;
@@ -58,6 +59,8 @@ final class PurchasingPage {
 			'wcbom-purchasing',
 			array( $this, 'render_page' )
 		);
+
+		ContextualHelp::attach( $this->hook_suffix, 'vendors-and-purchase-orders' );
 	}
 
 	/**

@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace WCBOM\Admin;
 
+use WCBOM\Admin\Guide\ContextualHelp;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -50,6 +52,8 @@ final class ManufacturePage {
 			'wcbom-manufacturing',
 			array( $this, 'render_page' )
 		);
+
+		ContextualHelp::attach( $this->hook_suffix, 'manufacturing' );
 	}
 
 	/**

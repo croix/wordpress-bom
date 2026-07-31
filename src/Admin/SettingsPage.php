@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace WCBOM\Admin;
 
 use WC_Admin_Settings;
+use WCBOM\Admin\Guide\ContextualHelp;
 use WCBOM\Purchasing\VendorsFeature;
 use WCBOM\Reports\LowStockDigest;
 use WCBOM\Stock\NegativeStockPolicy;
@@ -36,6 +37,15 @@ final class SettingsPage {
 	private const NONCE_ACTION = 'wcbom-settings';
 
 	/**
+	 * The hook suffix WordPress assigns this submenu, captured from
+	 * add_submenu_page()'s return value — see Admin\ManufacturePage's
+	 * docblock on the same property for why.
+	 *
+	 * @var string|false|null
+	 */
+	private $hook_suffix;
+
+	/**
 	 * Hooks the admin menu callback.
 	 */
 	public function register(): void {
@@ -46,7 +56,7 @@ final class SettingsPage {
 	 * Adds the page under the plugin's own top-level menu.
 	 */
 	public function add_menu_page(): void {
-		add_submenu_page(
+		$this->hook_suffix = add_submenu_page(
 			PluginMenu::SLUG,
 			__( 'Settings', 'wcbom' ),
 			__( 'Settings', 'wcbom' ),
@@ -54,6 +64,8 @@ final class SettingsPage {
 			'wcbom-settings',
 			array( $this, 'render_page' )
 		);
+
+		ContextualHelp::attach( $this->hook_suffix, 'settings' );
 	}
 
 	/**

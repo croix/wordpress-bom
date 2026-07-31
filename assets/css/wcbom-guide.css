@@ -1,0 +1,50 @@
+.wcbom-guide {
+	max-width: 900px;
+}
+
+.wcbom-guide-toc {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	padding: 12px 20px;
+	margin: 16px 0 32px;
+}
+
+.wcbom-guide-toc ul {
+	columns: 2;
+	margin: 0;
+}
+
+.wcbom-guide-toc li {
+	margin: 4px 0;
+}
+
+.wcbom-guide-section {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	padding: 20px 24px;
+	margin-bottom: 24px;
+}
+
+.wcbom-guide-section h2 {
+	margin-top: 0;
+}
+
+.wcbom-guide-screenshot {
+	max-width: 100%;
+	height: auto;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	margin: 12px 0;
+	display: block;
+}
+
+.wcbom-guide-links {
+	margin-top: 16px;
+}
+
+.wcbom-guide-links .button {
+	margin-right: 8px;
+	margin-bottom: 8px;
+}

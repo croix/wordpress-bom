@@ -11,6 +11,7 @@ namespace WCBOM;
 
 use WCBOM\Admin\DeletionGuard;
 use WCBOM\Admin\EndpointsPage;
+use WCBOM\Admin\GuidePage;
 use WCBOM\Admin\ImportExportHandlers;
 use WCBOM\Admin\InventoryPage;
 use WCBOM\Admin\ManufacturePage;
@@ -132,6 +133,7 @@ final class Plugin {
 		( new PurchasingPage() )->register();
 		( new ReportsPage() )->register();
 		( new EndpointsPage() )->register();
+		( new GuidePage() )->register();
 		( new ImportExportHandlers( $bom_csv, $ledger ) )->register();
 		( new LowStockDigest( $low_stock_report ) )->register();
 		( new SettingsPage() )->register();

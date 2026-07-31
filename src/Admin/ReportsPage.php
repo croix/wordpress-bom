@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace WCBOM\Admin;
 
+use WCBOM\Admin\Guide\ContextualHelp;
 use WCBOM\Admin\ImportExportHandlers as IE;
 
 defined( 'ABSPATH' ) || exit;
@@ -52,6 +53,8 @@ final class ReportsPage {
 			'wcbom-reports',
 			array( $this, 'render_page' )
 		);
+
+		ContextualHelp::attach( $this->hook_suffix, 'reports' );
 	}
 
 	/**

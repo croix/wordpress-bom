@@ -42,6 +42,8 @@ cp wc-bom-stock.php uninstall.php readme.txt "$STAGE/"
 cp -R src "$STAGE/src"
 mkdir -p "$STAGE/assets"
 cp -R assets/build "$STAGE/assets/build"
+cp -R assets/css "$STAGE/assets/css"
+cp -R assets/docs "$STAGE/assets/docs"
 
 # Generate the production autoloader (no dev packages — our only runtime
 # dependency is the PSR-4 autoloader itself).

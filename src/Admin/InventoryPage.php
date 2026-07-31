@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace WCBOM\Admin;
 
+use WCBOM\Admin\Guide\ContextualHelp;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -54,6 +56,8 @@ final class InventoryPage {
 			PluginMenu::SLUG,
 			array( $this, 'render_page' )
 		);
+
+		ContextualHelp::attach( $this->hook_suffix, 'component-inventory' );
 	}
 
 	/**
