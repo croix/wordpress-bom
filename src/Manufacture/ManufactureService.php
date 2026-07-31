@@ -11,6 +11,7 @@ namespace WCBOM\Manufacture;
 
 use WCBOM\Bom\BomRepository;
 use WCBOM\Stock\Ledger;
+use WCBOM\Stock\NegativeStockPolicy;
 use WCBOM\Stock\OperationGuard;
 use WCBOM\Stock\StockService;
 
@@ -112,6 +113,11 @@ final class ManufactureService {
 	 *                    short and $allow_negative is false.
 	 */
 	public function complete( int $mo_id, string $op_key, bool $allow_negative = false ): ManufactureOrder {
+		// The sitewide setting (§11.2) makes the per-operation "build
+		// anyway" override unnecessary; OR-ing it here rather than in the
+		// REST layer means every caller honors it and it's unit-testable.
+		$allow_negative = $allow_negative || NegativeStockPolicy::allowed();
+
 		$mo = $this->must_get( $mo_id );
 
 		if ( ManufactureOrder::STATUS_DRAFT !== $mo->status ) {

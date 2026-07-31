@@ -11,6 +11,7 @@ namespace WCBOM\Admin;
 
 use WC_Admin_Settings;
 use WCBOM\Reports\LowStockDigest;
+use WCBOM\Stock\NegativeStockPolicy;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -25,8 +26,8 @@ defined( 'ABSPATH' ) || exit;
  * settings tab. `save_fields()` does no nonce/capability check itself
  * (that's the tab system's job normally), so this class adds its own.
  *
- * Currently two settings: the uninstall data policy (BUILD_PLAN.md
- * §14.6) and the low-stock digest (§5.5, Phase 5).
+ * Currently: the uninstall data policy (BUILD_PLAN.md §14.6), the
+ * negative-stock policy (§11.2), and the low-stock digest (§5.5, Phase 5).
  */
 final class SettingsPage {
 
@@ -92,6 +93,14 @@ final class SettingsPage {
 				'desc'     => __( 'Permanently delete this plugin\'s data when the plugin is deleted from the Plugins screen.', 'wcbom' ),
 				'desc_tip' => __( 'When unchecked (the default), deleting the plugin keeps every BOM, the full stock ledger, and all manufacture-order history in the database, so reinstalling picks up exactly where you left off. Only enable this if you want deletion to permanently erase all of that.', 'wcbom' ),
 				'id'       => 'wcbom_purge_data_on_uninstall',
+				'type'     => 'checkbox',
+				'default'  => 'no',
+			),
+			array(
+				'title'    => __( 'Allow negative component stock', 'wcbom' ),
+				'desc'     => __( 'Let manual inventory adjustments and manufacture orders take a component\'s stock below zero without asking each time.', 'wcbom' ),
+				'desc_tip' => __( 'Applies only to deliberate back-office operations: manual Adjust entries and completing a manufacture order that\'s short a component. Customer orders are unaffected either way — a paid order always consumes its components (going negative if it must) and is flagged for you to reconcile, because refusing a paid order is worse than a stock discrepancy.', 'wcbom' ),
+				'id'       => NegativeStockPolicy::OPTION,
 				'type'     => 'checkbox',
 				'default'  => 'no',
 			),

@@ -36,6 +36,7 @@ function wcbom_run_uninstall(): void {
 	delete_option( 'wcbom_recommended_plugins_dismissed' );
 	delete_option( 'wcbom_low_stock_digest_enabled' );
 	delete_option( 'wcbom_low_stock_digest_email' );
+	delete_option( 'wcbom_allow_negative_stock' );
 }
 
 wcbom_run_uninstall();

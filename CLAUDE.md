@@ -137,7 +137,7 @@ The next `phpunit` run recreates all tables (`WC_Install::install()` + `Schema::
 - [x] Phase 5: reports, import/export, REST, CLI — **done and verified 2026-07-30, see Progress Log**
 - [x] Phase 6: hardening, tests, release prep — **done and verified 2026-07-30, see Progress Log** (two real bugs found and fixed along the way: transaction-nesting in StockService/BomRepository, and a Blocks-checkout stock-reservation gap in PhantomStock)
 - [x] Phase 7: WooCommerce native COGS integration — **done and verified 2026-07-30, see Progress Log**
-- [ ] §11 closeout: negative-stock setting + phantom-display-format resolution — **decided 2026-07-30 (BUILD_PLAN §11.2/§11.3), setting not yet built** (~1–2 hours)
+- [x] §11 closeout: negative-stock setting + phantom-display-format resolution — **done and verified 2026-07-30, see Progress Log**
 - [ ] Phase 9: vendors & purchase orders, strictly opt-in — **spec'd 2026-07-30 (BUILD_PLAN §5.13), not yet built** (~2–3 days). **Hard requirement: default off, whole section invisible until enabled, manual inventory unchanged when off.**
 - [ ] Phase 10: nested BOMs / sub-assemblies — **spec'd 2026-07-30 (BUILD_PLAN §5.14), not yet built** (~1 day). Sub-assemblies must be MANUFACTURED products; made-to-order components rejected; cycle detection at save.
 - [ ] Phase 8: in-app documentation & training module — **spec'd 2026-07-30 (BUILD_PLAN §5.12), not yet built** (~2–3 days). **Must be built LAST** (the developer's ordering rule) so nothing is created after it and left out of training — now queued behind the §11 closeout and Phases 9–10. Its coverage test/screenshot script must run with the §5.13 vendors feature ON.
@@ -149,6 +149,20 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — §11 closeout built: negative-stock setting + live-verified phantom display format
+
+Built the two things left over from the scope-planning session below.
+
+**"Allow negative component stock" setting** — new `Stock\NegativeStockPolicy` (a thin `get_option()` wrapper, default off), a checkbox on the Settings page, and wired into the two manual-operation call sites: `ManufactureService::complete()` ORs it into the existing per-call `$allow_negative` parameter (so a future caller's explicit override still works, but the setting alone is now sufficient), and `InventoryApi::apply_adjust()` (which previously hardcoded `true` unconditionally — predating this setting entirely) now reads it directly. Order consumption (`OrderSync`) was deliberately left untouched — §13.3's "never fatal a paid checkout" behavior is an invariant, not a preference, so it doesn't consult this setting at all, by design. `uninstall.php`'s purge list gained the new option.
+
+**Phantom stock display format — resolved with no code change, proven rather than assumed.** Traced the real WooCommerce call chain before concluding anything: `wc_get_stock_html()` → `$product->get_availability()` → `get_availability_text()` → `wc_format_stock_for_display()`, and that last function is the one that actually reads `get_option('woocommerce_stock_format')` — it calls `$product->get_stock_quantity()` first (already going through `StorefrontStock`'s phantom-qty filter) and only then decides, independently, whether to show the number based on the native setting. Our filter operates strictly one layer below where the display decision is made, so there is no code path where they could conflict. **Verified live, not just read from source:** with WC's format set to "only show when low" and the seeded Custom 24oz Tumbler's buildable quantity at 40 (its low-stock threshold is 2), the real storefront page showed plain "In stock" with no number — flipped back to the default format, the same page showed "40 in stock." Exactly the behavior a real-stock product would show at the same numbers.
+
+New `tests/NegativeStockPolicyTest.php` (5 tests): option defaults off and reflects stored value; `ManufactureService::complete()` blocked by default under shortage and proceeds when the setting is on (without needing the per-call override); `InventoryApi::apply_adjust()` honors the same setting end-to-end (built via a direct `WP_REST_Request`, no full REST dispatch needed). Full suite now 29 tests (was 24), all passing; PHPCS and PHPStan level 6 both clean.
+
+**Verified live**: toggled the new checkbox through a real browser save on the Settings page (not simulated — confirmed via `wp option get` that the real save round-tripped), restored to default, `wp wcbom audit` clean, debug.log empty throughout.
+
+BUILD_PLAN.md §11 updated: items 2, 3, and 5 all now struck through/resolved (item 5 was actually completed back in Phase 6 but never marked — doc drift caught and fixed in the process).
 
 ### 2026-07-30 — Scope additions before docs: vendors & POs (opt-in, §5.13/Phase 9), nested BOMs (§5.14/Phase 10), §11 items 2/3/5 resolved
 

@@ -13,6 +13,7 @@ use WC_Product;
 use WCBOM\Bom\BomRepository;
 use WCBOM\Stock\InsufficientStockException;
 use WCBOM\Stock\Ledger;
+use WCBOM\Stock\NegativeStockPolicy;
 use WCBOM\Stock\OperationGuard;
 use WCBOM\Stock\PhantomStock;
 use WCBOM\Stock\StockService;
@@ -234,8 +235,10 @@ final class InventoryApi {
 
 	/**
 	 * Adjust: signed delta with a required note — the exception path
-	 * (damage, shrinkage, found stock). Allows the result to go negative,
-	 * since this is the deliberate manual-override path.
+	 * (damage, shrinkage, found stock). Whether the result may go negative
+	 * is governed by the §11.2 setting (NegativeStockPolicy) — until
+	 * 2026-07-30 this path hardcoded allow_negative=true, predating the
+	 * setting; the required note remains the audit guardrail either way.
 	 *
 	 * @param WP_REST_Request $request Body: op_key, note (required), items[{product_id, qty}].
 	 * @return WP_REST_Response|WP_Error
@@ -262,7 +265,7 @@ final class InventoryApi {
 			$deltas[ $item['product_id'] ] = (float) $item['qty'];
 		}
 
-		return $this->apply( $request, $deltas, Ledger::REASON_MANUAL_ADJUST, true );
+		return $this->apply( $request, $deltas, Ledger::REASON_MANUAL_ADJUST, NegativeStockPolicy::allowed() );
 	}
 
 	/**
