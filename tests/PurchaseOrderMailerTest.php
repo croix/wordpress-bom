@@ -43,6 +43,25 @@ final class PurchaseOrderMailerTest extends WCBOM_UnitTestCase {
 		$this->assertSame( 'merchant@example.test', $sent[1]['to'] );
 	}
 
+	/**
+	 * to_vendor=false must skip the vendor entirely — not just "vendor has
+	 * no email" (that's a different path, tested below), but a vendor
+	 * that *does* have a valid email simply isn't contacted because it
+	 * wasn't requested. No warning either, since nothing was actually
+	 * asked of that recipient.
+	 */
+	public function test_self_only_sends_without_vendor_checked(): void {
+		$user_id = self::factory()->user->create( array( 'user_email' => 'merchant@example.test' ) );
+		wp_set_current_user( $user_id );
+
+		$po = $this->make_po( 'vendor@example.test' ); // Vendor has a valid email, but to_vendor will be false.
+
+		$result = ( new PurchaseOrderMailer( new VendorRepository() ) )->send( $po, false, true );
+
+		$this->assertSame( array( 'merchant@example.test' ), $result['sent_to'] );
+		$this->assertSame( array(), $result['warnings'], 'Skipping the vendor by choice must not produce a warning.' );
+	}
+
 	public function test_vendor_with_no_email_warns_but_self_still_sends(): void {
 		$user_id = self::factory()->user->create( array( 'user_email' => 'merchant@example.test' ) );
 		wp_set_current_user( $user_id );
