@@ -3,6 +3,7 @@ import {
 	Button,
 	Card,
 	CardBody,
+	CheckboxControl,
 	Modal,
 	Notice,
 	SelectControl,
@@ -222,6 +223,9 @@ function PurchaseOrdersTab( { restNamespace } ) {
 											<Button variant="tertiary" onClick={ () => refetchThenOpen( order, 'view' ) }>
 												{ __( 'View', 'wcbom' ) }
 											</Button>{ ' ' }
+											<Button variant="tertiary" onClick={ () => refetchThenOpen( order, 'send' ) }>
+												{ __( 'Send PO', 'wcbom' ) }
+											</Button>{ ' ' }
 										</>
 									) }
 									<Button variant="tertiary" onClick={ () => refetchThenOpen( order, 'costs' ) }>
@@ -267,6 +271,27 @@ function PurchaseOrdersTab( { restNamespace } ) {
 					order={ detailOrder.order }
 					onClose={ () => setDetailOrder( null ) }
 					onSaved={ () => onActioned( __( 'Costs updated.', 'wcbom' ) ) }
+				/>
+			) }
+
+			{ detailOrder && 'send' === detailOrder.mode && (
+				<SendModal
+					restNamespace={ restNamespace }
+					order={ detailOrder.order }
+					onClose={ () => setDetailOrder( null ) }
+					onSent={ ( result ) => {
+						setDetailOrder( null );
+						const parts = [
+							sprintf(
+								/* translators: %s: comma-separated list of email addresses the PO was sent to */
+								__( 'Sent to: %s', 'wcbom' ),
+								result.sent_to.join( ', ' )
+							),
+							...result.warnings,
+						];
+						setNotice( { status: result.warnings.length ? 'warning' : 'success', message: parts.join( ' ' ) } );
+						load();
+					} }
 				/>
 			) }
 		</>
@@ -638,6 +663,77 @@ function CostsModal( { restNamespace, order, onClose, onSaved } ) {
 			<p>
 				<Button variant="primary" isBusy={ submitting } disabled={ submitting } onClick={ submit }>
 					{ __( 'Save', 'wcbom' ) }
+				</Button>{ ' ' }
+				<Button variant="tertiary" disabled={ submitting } onClick={ onClose }>
+					{ __( 'Cancel', 'wcbom' ) }
+				</Button>
+			</p>
+		</Modal>
+	);
+}
+
+// Recipients are resolved server-side from records already on file (the
+// vendor's own email, the current WP user's account email) — this modal
+// never collects an address to send to, so it can't become an
+// arbitrary-email relay.
+function SendModal( { restNamespace, order, onClose, onSent } ) {
+	const [ toVendor, setToVendor ] = useState( true );
+	const [ toMyself, setToMyself ] = useState( false );
+	const [ submitting, setSubmitting ] = useState( false );
+	const [ error, setError ] = useState( null );
+
+	function submit() {
+		setError( null );
+		setSubmitting( true );
+
+		apiFetch( {
+			path: `/${ restNamespace }/purchase-orders/${ order.po_id }/send`,
+			method: 'POST',
+			data: { to_vendor: toVendor, to_myself: toMyself },
+		} )
+			.then( onSent )
+			.catch( ( err ) => setError( err.message || String( err ) ) )
+			.finally( () => setSubmitting( false ) );
+	}
+
+	return (
+		<Modal title={ sprintf(
+			/* translators: %d: purchase order ID */
+			__( 'Send PO #%d', 'wcbom' ),
+			order.po_id
+		) } onRequestClose={ onClose }>
+			{ error && (
+				<Notice status="error" isDismissible={ false }>
+					{ error }
+				</Notice>
+			) }
+
+			<p className="description">
+				{ __( 'Sends a plain-text summary of this purchase order\'s details to whichever email address(es) below are on file.', 'wcbom' ) }
+			</p>
+
+			<Field>
+				<CheckboxControl
+					label={ sprintf(
+						/* translators: %s: vendor name */
+						__( 'Send to vendor (%s)', 'wcbom' ),
+						order.vendor_name
+					) }
+					checked={ toVendor }
+					onChange={ setToVendor }
+				/>
+			</Field>
+			<Field>
+				<CheckboxControl
+					label={ __( 'Send a copy to myself', 'wcbom' ) }
+					checked={ toMyself }
+					onChange={ setToMyself }
+				/>
+			</Field>
+
+			<p>
+				<Button variant="primary" isBusy={ submitting } disabled={ submitting || ( ! toVendor && ! toMyself ) } onClick={ submit }>
+					{ __( 'Send', 'wcbom' ) }
 				</Button>{ ' ' }
 				<Button variant="tertiary" disabled={ submitting } onClick={ onClose }>
 					{ __( 'Cancel', 'wcbom' ) }

@@ -33,6 +33,7 @@ use WCBOM\Manufacture\ProductFactory;
 use WCBOM\Orders\OrderSync;
 use WCBOM\Orders\RefundHandler;
 use WCBOM\Purchasing\LandedCost;
+use WCBOM\Purchasing\PurchaseOrderMailer;
 use WCBOM\Purchasing\PurchaseOrderRepository;
 use WCBOM\Purchasing\PurchaseOrderService;
 use WCBOM\Purchasing\VendorRepository;
@@ -107,6 +108,7 @@ final class Plugin {
 		$po_orders   = new PurchaseOrderRepository();
 		$po_service  = new PurchaseOrderService( $po_orders, $stock, $guard );
 		$landed_cost = new LandedCost();
+		$po_mailer   = new PurchaseOrderMailer( $vendors );
 
 		$buildable_report = new BuildableReport( $boms );
 		$usage_report     = new ComponentUsageReport( $boms, $ledger );
@@ -138,12 +140,12 @@ final class Plugin {
 
 		add_action(
 			'rest_api_init',
-			static function () use ( $boms, $stock, $guard, $mo_orders, $mo_service, $vendors, $po_orders, $po_service, $landed_cost, $ledger, $buildable_report, $usage_report, $low_stock_report, $margin_report ) {
+			static function () use ( $boms, $stock, $guard, $mo_orders, $mo_service, $vendors, $po_orders, $po_service, $landed_cost, $po_mailer, $ledger, $buildable_report, $usage_report, $low_stock_report, $margin_report ) {
 				( new Api( $boms ) )->register_routes();
 				( new InventoryApi( $stock, $boms, $guard, $po_orders ) )->register_routes();
 				( new SampleDataApi( new SampleData() ) )->register_routes();
 				( new ManufactureApi( $mo_service, $mo_orders, $boms ) )->register_routes();
-				( new PurchasingApi( $po_service, $po_orders, $vendors, $landed_cost ) )->register_routes();
+				( new PurchasingApi( $po_service, $po_orders, $vendors, $landed_cost, $po_mailer ) )->register_routes();
 				( new ReportsApi( $buildable_report, $usage_report, $low_stock_report, $margin_report ) )->register_routes();
 				( new LedgerApi( $ledger ) )->register_routes();
 			}

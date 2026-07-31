@@ -527,6 +527,14 @@ Three additional PO-level fields — `freight_cost`, `tax_cost`, `fees_cost` (al
 
 **Display-only, same reasoning as `unit_cost` itself**: computed live from the current freight/tax/fee fields on every read, never written to a product field or fed into `Reports\BomCost`/`Integrations\CogsProvider`. Feeding it into cost/margin reporting was considered and explicitly deferred — it raises the question of which PO's landed cost a shared component should use when it's been ordered from multiple vendors at different freight rates, which is real complexity this addendum doesn't need to solve to deliver the requested landed-cost visibility.
 
+#### Sending the PO by email (added 2026-07-31)
+
+A "Send PO" action, available whenever a PO is past draft (same gating as "View" — sending a draft that was never formally placed doesn't make sense). Opens a small modal with two checkboxes, "Send to vendor" (pre-checked) and "Send a copy to myself" (the currently logged-in WP user, not necessarily whoever created the PO).
+
+**Recipients are resolved from records already on file — never a typed-in address**, so this can never become an arbitrary-email relay: the vendor's own `email` field, and the current user's WP account email. A new `Purchasing\PurchaseOrderMailer` composes a plain-text summary (PO #, vendor, reference, line items at their plain `unit_cost` — not the amortized landed cost, which is this plugin's own internal analysis and not something to hand a vendor — plus the freight/tax/fees/grand-total footer) and sends one `wp_mail()` per resolved recipient via `POST /purchase-orders/<id>/send`.
+
+**Partial success over hard failure**, matching this plugin's established §13 stance: if "to vendor" is checked but the vendor has no email on file, that's a warning in the response, not a blocking error — a copy still goes out to whichever recipient *does* resolve. Only throws when literally nothing could be sent (neither checkbox selected, or every selected recipient lacks a usable email).
+
 #### Surfacing on-order awareness
 
 When (and only when) the feature is on:
@@ -716,6 +724,7 @@ Phase 9 addendum (freight/tax/fees + close relabeling, added 2026-07-31) adds:
 
 29. Freight/tax/fees are editable via `update_costs()` regardless of PO status — draft, ordered, or fully received — and `null` clears a previously-set field rather than zeroing it.
 30. Landed cost amortizes proportional to each line's ordered value; a line with no unit_cost gets zero allocation and a null landed_unit_cost, while the PO's total-fees figure still reflects the true total. Zero fees means every line's landed cost equals its plain unit cost.
+31. Sending a PO with both recipients selected and both emails on file sends two distinct emails (one per recipient) and reports both addresses back; a vendor with no email on file produces a warning rather than a failure when "to myself" is still selected and resolvable. Selecting neither recipient, or having no selected recipient resolve to a usable email at all, throws rather than silently no-oping.
 
 ---
 

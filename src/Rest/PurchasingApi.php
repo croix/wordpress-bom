@@ -12,6 +12,7 @@ namespace WCBOM\Rest;
 use WCBOM\Purchasing\LandedCost;
 use WCBOM\Purchasing\PurchaseOrder;
 use WCBOM\Purchasing\PurchaseOrderItem;
+use WCBOM\Purchasing\PurchaseOrderMailer;
 use WCBOM\Purchasing\PurchaseOrderRepository;
 use WCBOM\Purchasing\PurchaseOrderService;
 use WCBOM\Purchasing\Vendor;
@@ -41,12 +42,14 @@ final class PurchasingApi {
 	 * @param PurchaseOrderRepository $orders      PO lookup for list/get.
 	 * @param VendorRepository        $vendors     Vendor CRUD.
 	 * @param LandedCost              $landed_cost Freight/tax/fee amortization for display.
+	 * @param PurchaseOrderMailer     $mailer      Emails the PO to the vendor/current user.
 	 */
 	public function __construct(
 		private readonly PurchaseOrderService $purchasing,
 		private readonly PurchaseOrderRepository $orders,
 		private readonly VendorRepository $vendors,
-		private readonly LandedCost $landed_cost
+		private readonly LandedCost $landed_cost,
+		private readonly PurchaseOrderMailer $mailer
 	) {}
 
 	/**
@@ -167,6 +170,16 @@ final class PurchasingApi {
 			array(
 				'methods'             => WP_REST_Server::CREATABLE,
 				'callback'            => array( $this, 'cancel' ),
+				'permission_callback' => array( $this, 'can_manage' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/purchase-orders/(?P<id>\d+)/send',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'send_email' ),
 				'permission_callback' => array( $this, 'can_manage' ),
 			)
 		);
@@ -422,6 +435,31 @@ final class PurchasingApi {
 		}
 
 		return new WP_REST_Response( array( 'order' => $this->present_order( $po ) ) );
+	}
+
+	/**
+	 * Emails the PO to its vendor and/or the current user.
+	 *
+	 * @param WP_REST_Request $request Route param: id. Body: to_vendor?, to_myself? (booleans).
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function send_email( WP_REST_Request $request ) {
+		$po = $this->orders->get( (int) $request->get_param( 'id' ) );
+		if ( null === $po ) {
+			return new WP_Error( 'wcbom_po_not_found', __( 'Unknown purchase order.', 'wcbom' ), array( 'status' => 404 ) );
+		}
+
+		try {
+			$result = $this->mailer->send(
+				$po,
+				(bool) $request->get_param( 'to_vendor' ),
+				(bool) $request->get_param( 'to_myself' )
+			);
+		} catch ( \RuntimeException $e ) {
+			return new WP_Error( 'wcbom_po_send_failed', $e->getMessage(), array( 'status' => 400 ) );
+		}
+
+		return new WP_REST_Response( $result );
 	}
 
 	/**

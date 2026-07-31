@@ -13,6 +13,7 @@ use WCBOM\Admin\PurchasingPage;
 use WCBOM\Bom\BomRepository;
 use WCBOM\Purchasing\LandedCost;
 use WCBOM\Purchasing\PurchaseOrder;
+use WCBOM\Purchasing\PurchaseOrderMailer;
 use WCBOM\Purchasing\PurchaseOrderRepository;
 use WCBOM\Purchasing\PurchaseOrderService;
 use WCBOM\Purchasing\VendorRepository;
@@ -46,7 +47,8 @@ final class PurchasingTest extends WCBOM_UnitTestCase {
 		$this->assertFalse( has_action( 'admin_menu', array( $page, 'add_menu_page' ) ), 'The Purchasing menu page must not be registered when the feature is off.' );
 
 		$po_orders = new PurchaseOrderRepository();
-		$api       = new PurchasingApi( new PurchaseOrderService( $po_orders, new StockService( new Ledger() ), new OperationGuard() ), $po_orders, new VendorRepository(), new LandedCost() );
+		$vendors   = new VendorRepository();
+		$api       = new PurchasingApi( new PurchaseOrderService( $po_orders, new StockService( new Ledger() ), new OperationGuard() ), $po_orders, $vendors, new LandedCost(), new PurchaseOrderMailer( $vendors ) );
 		$api->register_routes();
 		$this->assertArrayNotHasKey( '/wcbom/v1/vendors', rest_get_server()->get_routes(), 'No vendor REST route may exist when the feature is off.' );
 		$this->assertArrayNotHasKey( '/wcbom/v1/purchase-orders', rest_get_server()->get_routes(), 'No purchase-order REST route may exist when the feature is off.' );

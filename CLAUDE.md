@@ -150,6 +150,20 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
 
+### 2026-07-31 — Phase 9 addendum #2: "Send PO" by email
+
+the developer asked for a "Send PO" button with To Vendor / To Myself checkboxes, emailing the PO's details to whichever address(es) are on file.
+
+**New `Purchasing\PurchaseOrderMailer`** — resolves recipients strictly from existing records (the vendor's own `email` field via `VendorRepository`; the current WP user's account email via `wp_get_current_user()`), **never a typed-in address**, so the feature can't become an arbitrary-email relay. Composes a plain-text PO summary (number, vendor, reference, expected date, line items at their plain `unit_cost` — deliberately not the amortized landed cost from the earlier addendum, since that's this plugin's own internal analysis and not something to hand a vendor — then a freight/tax/fees/grand-total footer) and sends one `wp_mail()` call per resolved recipient.
+
+**Partial success over hard failure**, matching this plugin's established §13 posture: if "to vendor" is checked but the vendor has no email on file, that's a warning in the response (surfaced in the UI notice), not a blocking error, as long as some other selected recipient still resolves. Only throws when nothing could be sent at all — neither box checked, or every checked recipient lacks a usable email.
+
+New `POST /purchase-orders/<id>/send` route (gated by `VendorsFeature` same as every other Purchasing route) and a "Send PO" button — gated to non-draft status, same reasoning as "View": sending a PO that was never formally placed doesn't make sense. Modal defaults to vendor checked, self unchecked.
+
+New `tests/PurchaseOrderMailerTest.php` (5 tests): both recipients resolve and get one email each; a vendor with no email still lets a self-copy through with a warning; neither box checked throws; zero resolvable recipients throws; the composed subject/body contain the right PO number, vendor, line items, and totals. Full suite now 45 tests (was 40), all passing; PHPCS (64 files) and PHPStan level 6 both clean; `wp i18n make-pot` clean.
+
+**Verified live, not just via tests**: created a real vendor with an email on file, placed a PO, set freight/tax via the real "Edit costs" modal, clicked the real "Send PO" button with both boxes checked — the success notice read "Sent to: vendor@acmeblanks.test, [redacted]" (the vendor's email plus the actual logged-in admin's real WP account email), and a direct `compose_body()` call against that same live PO produced a correctly formatted summary with the exact right grand total (50 × $2.00 + $10 freight + $2 tax = $112.00). Environment restored afterward: test vendor/PO deleted, feature disabled, `wp wcbom seed --reset`, `wp wcbom audit` clean, debug.log empty.
+
 ### 2026-07-31 — Phase 9 addendum: close-an-under-received-PO + freight/tax/fees landed cost
 
 the developer flagged two workflow gaps after using Phase 9: no way to close out a PO that's never going to be fully received, and no way to capture freight/taxes/fees against a PO with amortization across its lines.
