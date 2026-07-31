@@ -95,7 +95,9 @@ git clone --depth 1 --filter=blob:none --sparse --branch 6.9 https://github.com/
 cd wordpress-develop
 git sparse-checkout set tests/phpunit
 ```
-Then copy `tests/phpunit` into the host-side wp-env directory that's already bind-mounted as `/wordpress-phpunit` inside the containers (find the path via `ls ~/.wp-env/` for the hash, then `~/.wp-env/<hash>/tests-WordPress-PHPUnit/tests/phpunit/`).
+Then copy `tests/phpunit` into the host-side wp-env directory that's already bind-mounted as `/wordpress-phpunit` inside the containers. **There are two separate mount targets, both need populating** (find the hash via `ls ~/.wp-env/`): `~/.wp-env/<hash>/tests-WordPress-PHPUnit/tests/phpunit/` (used by `tests-cli`/`tests-wordpress`, the one this section's test run actually needs) and `~/.wp-env/<hash>/WordPress-PHPUnit/tests/phpunit/` (used by the main `cli`/`wordpress` containers — populate for consistency even though the PHPUnit run itself doesn't touch it).
+
+If `tests-cli`/`tests-wordpress` were already running *before* you fixed the plugin-mount-path gotcha in step 3 above, restart them too (`docker compose restart tests-cli tests-wordpress`) — they have their own independent bind mounts of the same `woocommerce`/`woo-extra-product-options`/`variation-swatches-woo` folders and won't pick up a fix applied only to `cli`/`wordpress`.
 
 **Every run:**
 ```
@@ -144,6 +146,18 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Home Intel laptop: PHPUnit test suite set up, full 18-test pass verified
+
+Continuation of the same-day environment-standup session below. Fetched the WP 6.9 `tests/phpunit` subtree via the documented `git clone --sparse` workaround (confirmed `tests-cli`'s WP core version is 6.9, matching the branch already named in the runbook) and copied it onto the host.
+
+**One addition to what the runbook said:** there are actually *two* separate host directories bind-mounted as `/wordpress-phpunit` — `tests-WordPress-PHPUnit/tests/phpunit/` (used by `tests-cli`/`tests-wordpress`) and `WordPress-PHPUnit/tests/phpunit/` (used by the main `cli`/`wordpress`). Populated both; runbook above updated to say so explicitly.
+
+**Same mount-staleness gotcha as the environment-standup session, but on a different pair of containers:** `tests-cli`/`tests-wordpress` had already been created (via the full-stack `docker compose up -d` earlier that session) *before* the plugin top-level folders were fixed — restarting `cli`/`wordpress` at the time didn't help these, since each container pair has its own independent bind mount of the same host folders. `docker compose exec -T tests-cli ls .../plugins/woocommerce/` showed empty until `docker compose restart tests-cli tests-wordpress` was run. Runbook updated with this as an explicit step.
+
+**Result: full pass, matching the documented Phase 6 baseline exactly** — `OK (18 tests, 72 assertions)`. Two `WordPress database error` lines in the output (`wc_webhooks`/`woocommerce_attribute_taxonomies` tables not existing) are expected first-run bootstrap noise before `WC_Install::install()` creates them, not a real failure — consistent with the existing note above about the DB recreating tables from scratch on first run. Did not need the DB-wipe procedure (also documented above) since this was this machine's first run, not a stuck/polluted state.
+
+Cleaned up the temporary `/tmp/wordpress-develop` clone afterward. Dev environment (from the earlier entry) and now the test suite are both fully working on this machine, matching the arm64 build machine's capabilities as of the last Phase 6 session.
 
 ### 2026-07-30 — Home Intel laptop: full environment stood up for the first time, two real gotchas found
 
