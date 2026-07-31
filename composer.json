@@ -1,5 +1,5 @@
 {
-    "name": "poorvida/wc-bom-stock",
+    "name": "poorvida/pv-bom-stock",
     "description": "Bill-of-materials and component-level stock management for WooCommerce.",
     "license": "GPL-2.0-or-later",
     "require": {

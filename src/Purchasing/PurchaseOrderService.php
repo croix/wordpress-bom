@@ -53,7 +53,7 @@ final class PurchaseOrderService {
 	 */
 	public function create_draft( int $vendor_id, array $items, ?string $reference, ?string $expected_date, ?string $notes ): PurchaseOrder {
 		if ( array() === $items ) {
-			throw new \RuntimeException( esc_html__( 'A purchase order needs at least one line item.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'A purchase order needs at least one line item.', 'pv-bom-stock' ) );
 		}
 
 		$po_id = $this->orders->create_draft( $vendor_id, $items, $reference, $expected_date, $notes, get_current_user_id() );
@@ -79,10 +79,10 @@ final class PurchaseOrderService {
 		$po = $this->must_get( $po_id );
 
 		if ( PurchaseOrder::STATUS_DRAFT !== $po->status ) {
-			throw new \RuntimeException( esc_html__( 'Only a draft purchase order can be edited.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'Only a draft purchase order can be edited.', 'pv-bom-stock' ) );
 		}
 		if ( array() === $items ) {
-			throw new \RuntimeException( esc_html__( 'A purchase order needs at least one line item.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'A purchase order needs at least one line item.', 'pv-bom-stock' ) );
 		}
 
 		$this->orders->update_draft( $po_id, $vendor_id, $reference, $expected_date, $notes );
@@ -125,7 +125,7 @@ final class PurchaseOrderService {
 			return $po;
 		}
 		if ( array() === $po->items ) {
-			throw new \RuntimeException( esc_html__( 'Cannot place a purchase order with no line items.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'Cannot place a purchase order with no line items.', 'pv-bom-stock' ) );
 		}
 
 		$this->orders->mark_ordered( $po_id );
@@ -160,7 +160,7 @@ final class PurchaseOrderService {
 		$po = $this->must_get( $po_id );
 
 		if ( in_array( $po->status, array( PurchaseOrder::STATUS_DRAFT, PurchaseOrder::STATUS_CANCELLED ), true ) ) {
-			throw new \RuntimeException( esc_html__( 'This purchase order cannot be received against from its current status.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'This purchase order cannot be received against from its current status.', 'pv-bom-stock' ) );
 		}
 
 		$items_by_id = array();
@@ -177,14 +177,14 @@ final class PurchaseOrderService {
 				continue;
 			}
 			if ( ! isset( $items_by_id[ $poi_id ] ) ) {
-				throw new \RuntimeException( esc_html__( 'One of the submitted line items does not belong to this purchase order.', 'wcbom' ) );
+				throw new \RuntimeException( esc_html__( 'One of the submitted line items does not belong to this purchase order.', 'pv-bom-stock' ) );
 			}
 
 			$applied[ $poi_id ] = $qty;
 		}
 
 		if ( array() === $applied ) {
-			throw new \RuntimeException( esc_html__( 'Enter a received quantity for at least one line.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'Enter a received quantity for at least one line.', 'pv-bom-stock' ) );
 		}
 
 		if ( ! $this->guard->claim( $op_key, "Receive PO #{$po_id}" ) ) {
@@ -253,7 +253,7 @@ final class PurchaseOrderService {
 			return $po;
 		}
 		if ( PurchaseOrder::STATUS_RECEIVED === $po->status ) {
-			throw new \RuntimeException( esc_html__( 'A fully received purchase order cannot be cancelled.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'A fully received purchase order cannot be cancelled.', 'pv-bom-stock' ) );
 		}
 
 		$this->orders->update_status( $po_id, PurchaseOrder::STATUS_CANCELLED, current_time( 'mysql', true ) );
@@ -281,7 +281,7 @@ final class PurchaseOrderService {
 	private function must_get( int $po_id ): PurchaseOrder {
 		$po = $this->orders->get( $po_id );
 		if ( null === $po ) {
-			throw new \RuntimeException( esc_html__( 'Unknown purchase order.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'Unknown purchase order.', 'pv-bom-stock' ) );
 		}
 
 		return $po;

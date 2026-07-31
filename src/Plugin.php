@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace WCBOM;
 
+defined( 'ABSPATH' ) || exit;
+
 use WCBOM\Admin\DeletionGuard;
 use WCBOM\Admin\EndpointsPage;
 use WCBOM\Admin\GuidePage;

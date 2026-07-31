@@ -144,7 +144,7 @@ final class ReportsApi {
 	public function get_usage( WP_REST_Request $request ) {
 		$row = $this->usage->for_component( (int) $request->get_param( 'component_id' ) );
 		if ( null === $row ) {
-			return new WP_Error( 'wcbom_unknown_component', __( 'Unknown component.', 'wcbom' ), array( 'status' => 404 ) );
+			return new WP_Error( 'wcbom_unknown_component', __( 'Unknown component.', 'pv-bom-stock' ), array( 'status' => 404 ) );
 		}
 
 		return new WP_REST_Response( $row );

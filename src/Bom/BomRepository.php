@@ -311,7 +311,7 @@ final class BomRepository {
 				esc_html(
 					sprintf(
 						/* translators: %s: component product name */
-						__( '"%s" is a made-to-order product and can\'t be used as a BOM component — its stock is a computed buildable number, not a real on-hand count. Use a manufactured or standard product as the sub-assembly instead.', 'wcbom' ),
+						__( '"%s" is a made-to-order product and can\'t be used as a BOM component — its stock is a computed buildable number, not a real on-hand count. Use a manufactured or standard product as the sub-assembly instead.', 'pv-bom-stock' ),
 						$component ? $component->get_name() : "#{$component_id}"
 					)
 				)
@@ -348,7 +348,7 @@ final class BomRepository {
 				esc_html(
 					sprintf(
 						/* translators: %s: component product name */
-						__( 'This would create a circular Bill of Materials — "%s", directly or through its own recipe, eventually includes this product as a component.', 'wcbom' ),
+						__( 'This would create a circular Bill of Materials — "%s", directly or through its own recipe, eventually includes this product as a component.', 'pv-bom-stock' ),
 						$component ? $component->get_name() : "#{$component_id}"
 					)
 				)

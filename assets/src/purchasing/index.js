@@ -32,22 +32,22 @@ function formatNumber( n ) {
 }
 
 const PO_STATUS_LABELS = {
-	draft: __( 'Draft', 'wcbom' ),
-	ordered: __( 'Ordered', 'wcbom' ),
-	partially_received: __( 'Partially received', 'wcbom' ),
-	received: __( 'Received', 'wcbom' ),
-	cancelled: __( 'Cancelled', 'wcbom' ),
+	draft: __( 'Draft', 'pv-bom-stock' ),
+	ordered: __( 'Ordered', 'pv-bom-stock' ),
+	partially_received: __( 'Partially received', 'pv-bom-stock' ),
+	received: __( 'Received', 'pv-bom-stock' ),
+	cancelled: __( 'Cancelled', 'pv-bom-stock' ),
 };
 
 function PurchasingApp( { restNamespace } ) {
 	return (
 		<Card>
 			<CardBody>
-				<h1>{ __( 'Purchasing', 'wcbom' ) }</h1>
+				<h1>{ __( 'Purchasing', 'pv-bom-stock' ) }</h1>
 				<TabPanel
 					tabs={ [
-						{ name: 'orders', title: __( 'Purchase Orders', 'wcbom' ) },
-						{ name: 'vendors', title: __( 'Vendors', 'wcbom' ) },
+						{ name: 'orders', title: __( 'Purchase Orders', 'pv-bom-stock' ) },
+						{ name: 'vendors', title: __( 'Vendors', 'pv-bom-stock' ) },
 					] }
 				>
 					{ ( tab ) => ( 'orders' === tab.name
@@ -87,7 +87,7 @@ function PurchaseOrdersTab( { restNamespace } ) {
 	function place( order ) {
 		apiFetch( { path: `/${ restNamespace }/purchase-orders/${ order.po_id }/place`, method: 'POST' } )
 			.then( () => {
-				setNotice( { status: 'success', message: __( 'Purchase order placed.', 'wcbom' ) } );
+				setNotice( { status: 'success', message: __( 'Purchase order placed.', 'pv-bom-stock' ) } );
 				load();
 			} )
 			.catch( ( err ) => setNotice( { status: 'error', message: err.message || String( err ) } ) );
@@ -101,8 +101,8 @@ function PurchaseOrdersTab( { restNamespace } ) {
 	function cancel( order ) {
 		const isPartial = 'partially_received' === order.status;
 		const confirmText = isPartial
-			? __( 'Close this purchase order? The remaining outstanding quantity will no longer be expected. Stock already received is unaffected.', 'wcbom' )
-			: __( 'Cancel this purchase order? Already-received stock is unaffected — only the remaining outstanding quantity stops being expected.', 'wcbom' );
+			? __( 'Close this purchase order? The remaining outstanding quantity will no longer be expected. Stock already received is unaffected.', 'pv-bom-stock' )
+			: __( 'Cancel this purchase order? Already-received stock is unaffected — only the remaining outstanding quantity stops being expected.', 'pv-bom-stock' );
 
 		if ( ! window.confirm( confirmText ) ) {
 			return;
@@ -110,20 +110,20 @@ function PurchaseOrdersTab( { restNamespace } ) {
 
 		apiFetch( { path: `/${ restNamespace }/purchase-orders/${ order.po_id }/cancel`, method: 'POST' } )
 			.then( () => {
-				setNotice( { status: 'success', message: isPartial ? __( 'Purchase order closed.', 'wcbom' ) : __( 'Purchase order cancelled.', 'wcbom' ) } );
+				setNotice( { status: 'success', message: isPartial ? __( 'Purchase order closed.', 'pv-bom-stock' ) : __( 'Purchase order cancelled.', 'pv-bom-stock' ) } );
 				load();
 			} )
 			.catch( ( err ) => setNotice( { status: 'error', message: err.message || String( err ) } ) );
 	}
 
 	function deleteDraft( order ) {
-		if ( ! window.confirm( __( 'Delete this draft purchase order? Nothing has been ordered yet, so nothing is affected.', 'wcbom' ) ) ) {
+		if ( ! window.confirm( __( 'Delete this draft purchase order? Nothing has been ordered yet, so nothing is affected.', 'pv-bom-stock' ) ) ) {
 			return;
 		}
 
 		apiFetch( { path: `/${ restNamespace }/purchase-orders/${ order.po_id }`, method: 'DELETE' } )
 			.then( () => {
-				setNotice( { status: 'success', message: __( 'Draft deleted.', 'wcbom' ) } );
+				setNotice( { status: 'success', message: __( 'Draft deleted.', 'pv-bom-stock' ) } );
 				load();
 			} )
 			.catch( ( err ) => setNotice( { status: 'error', message: err.message || String( err ) } ) );
@@ -152,10 +152,10 @@ function PurchaseOrdersTab( { restNamespace } ) {
 
 			<p>
 				<SelectControl
-					label={ __( 'Status', 'wcbom' ) }
+					label={ __( 'Status', 'pv-bom-stock' ) }
 					value={ statusFilter }
 					options={ [
-						{ label: __( 'All', 'wcbom' ), value: '' },
+						{ label: __( 'All', 'pv-bom-stock' ), value: '' },
 						...Object.entries( PO_STATUS_LABELS ).map( ( [ value, label ] ) => ( { label, value } ) ),
 					] }
 					onChange={ setStatusFilter }
@@ -166,7 +166,7 @@ function PurchaseOrdersTab( { restNamespace } ) {
 
 			<p>
 				<Button variant="primary" onClick={ () => setShowCreate( true ) }>
-					{ __( '+ New purchase order', 'wcbom' ) }
+					{ __( '+ New purchase order', 'pv-bom-stock' ) }
 				</Button>
 			</p>
 
@@ -176,12 +176,12 @@ function PurchaseOrdersTab( { restNamespace } ) {
 				<table className="widefat wcbom-po-table">
 					<thead>
 						<tr>
-							<th>{ __( 'ID', 'wcbom' ) }</th>
-							<th>{ __( 'Vendor', 'wcbom' ) }</th>
-							<th>{ __( 'Reference', 'wcbom' ) }</th>
-							<th>{ __( 'Expected', 'wcbom' ) }</th>
-							<th>{ __( 'Status', 'wcbom' ) }</th>
-							<th>{ __( 'Created', 'wcbom' ) }</th>
+							<th>{ __( 'ID', 'pv-bom-stock' ) }</th>
+							<th>{ __( 'Vendor', 'pv-bom-stock' ) }</th>
+							<th>{ __( 'Reference', 'pv-bom-stock' ) }</th>
+							<th>{ __( 'Expected', 'pv-bom-stock' ) }</th>
+							<th>{ __( 'Status', 'pv-bom-stock' ) }</th>
+							<th>{ __( 'Created', 'pv-bom-stock' ) }</th>
 							<th></th>
 						</tr>
 					</thead>
@@ -198,45 +198,45 @@ function PurchaseOrdersTab( { restNamespace } ) {
 									{ 'draft' === order.status && (
 										<>
 											<Button variant="primary" onClick={ () => place( order ) }>
-												{ __( 'Place', 'wcbom' ) }
+												{ __( 'Place', 'pv-bom-stock' ) }
 											</Button>{ ' ' }
 											<Button variant="secondary" onClick={ () => setEditDraft( order ) }>
-												{ __( 'Edit', 'wcbom' ) }
+												{ __( 'Edit', 'pv-bom-stock' ) }
 											</Button>{ ' ' }
 											<Button variant="tertiary" isDestructive onClick={ () => deleteDraft( order ) }>
-												{ __( 'Delete', 'wcbom' ) }
+												{ __( 'Delete', 'pv-bom-stock' ) }
 											</Button>
 										</>
 									) }
 									{ ( 'ordered' === order.status || 'partially_received' === order.status ) && (
 										<>
 											<Button variant="primary" onClick={ () => refetchThenOpen( order, 'receive' ) }>
-												{ __( 'Receive', 'wcbom' ) }
+												{ __( 'Receive', 'pv-bom-stock' ) }
 											</Button>{ ' ' }
 											<Button variant="tertiary" isDestructive onClick={ () => cancel( order ) }>
-												{ 'partially_received' === order.status ? __( 'Close', 'wcbom' ) : __( 'Cancel', 'wcbom' ) }
+												{ 'partially_received' === order.status ? __( 'Close', 'pv-bom-stock' ) : __( 'Cancel', 'pv-bom-stock' ) }
 											</Button>{ ' ' }
 										</>
 									) }
 									{ 'draft' !== order.status && (
 										<>
 											<Button variant="tertiary" onClick={ () => refetchThenOpen( order, 'view' ) }>
-												{ __( 'View', 'wcbom' ) }
+												{ __( 'View', 'pv-bom-stock' ) }
 											</Button>{ ' ' }
 											<Button variant="tertiary" onClick={ () => refetchThenOpen( order, 'send' ) }>
-												{ __( 'Send PO', 'wcbom' ) }
+												{ __( 'Send PO', 'pv-bom-stock' ) }
 											</Button>{ ' ' }
 										</>
 									) }
 									<Button variant="tertiary" onClick={ () => refetchThenOpen( order, 'costs' ) }>
-										{ __( 'Edit costs', 'wcbom' ) }
+										{ __( 'Edit costs', 'pv-bom-stock' ) }
 									</Button>
 								</td>
 							</tr>
 						) ) }
 						{ 0 === orders.length && (
 							<tr>
-								<td colSpan={ 7 }>{ __( 'No purchase orders yet.', 'wcbom' ) }</td>
+								<td colSpan={ 7 }>{ __( 'No purchase orders yet.', 'pv-bom-stock' ) }</td>
 							</tr>
 						) }
 					</tbody>
@@ -248,7 +248,7 @@ function PurchaseOrdersTab( { restNamespace } ) {
 					restNamespace={ restNamespace }
 					order={ editDraft }
 					onClose={ () => { setShowCreate( false ); setEditDraft( null ); } }
-					onSaved={ () => onSaved( editDraft ? __( 'Purchase order updated.', 'wcbom' ) : __( 'Purchase order created as a draft. Nothing has been ordered yet.', 'wcbom' ) ) }
+					onSaved={ () => onSaved( editDraft ? __( 'Purchase order updated.', 'pv-bom-stock' ) : __( 'Purchase order created as a draft. Nothing has been ordered yet.', 'pv-bom-stock' ) ) }
 				/>
 			) }
 
@@ -257,7 +257,7 @@ function PurchaseOrdersTab( { restNamespace } ) {
 					restNamespace={ restNamespace }
 					order={ detailOrder.order }
 					onClose={ () => setDetailOrder( null ) }
-					onReceived={ () => onActioned( __( 'Receipt recorded.', 'wcbom' ) ) }
+					onReceived={ () => onActioned( __( 'Receipt recorded.', 'pv-bom-stock' ) ) }
 				/>
 			) }
 
@@ -270,7 +270,7 @@ function PurchaseOrdersTab( { restNamespace } ) {
 					restNamespace={ restNamespace }
 					order={ detailOrder.order }
 					onClose={ () => setDetailOrder( null ) }
-					onSaved={ () => onActioned( __( 'Costs updated.', 'wcbom' ) ) }
+					onSaved={ () => onActioned( __( 'Costs updated.', 'pv-bom-stock' ) ) }
 				/>
 			) }
 
@@ -284,7 +284,7 @@ function PurchaseOrdersTab( { restNamespace } ) {
 						const parts = [
 							sprintf(
 								/* translators: %s: comma-separated list of email addresses the PO was sent to */
-								__( 'Sent to: %s', 'wcbom' ),
+								__( 'Sent to: %s', 'pv-bom-stock' ),
 								result.sent_to.join( ', ' )
 							),
 							...result.warnings,
@@ -337,11 +337,11 @@ function PurchaseOrderModal( { restNamespace, order, onClose, onSaved } ) {
 		setError( null );
 
 		if ( ! vendorId ) {
-			setError( __( 'Choose a vendor.', 'wcbom' ) );
+			setError( __( 'Choose a vendor.', 'pv-bom-stock' ) );
 			return;
 		}
 		if ( 0 === lines.length ) {
-			setError( __( 'Add at least one line item.', 'wcbom' ) );
+			setError( __( 'Add at least one line item.', 'pv-bom-stock' ) );
 			return;
 		}
 
@@ -369,10 +369,10 @@ function PurchaseOrderModal( { restNamespace, order, onClose, onSaved } ) {
 		<Modal title={ isEdit
 			? sprintf(
 				/* translators: %d: purchase order ID */
-				__( 'Edit draft PO #%d', 'wcbom' ),
+				__( 'Edit draft PO #%d', 'pv-bom-stock' ),
 				order.po_id
 			)
-			: __( 'New purchase order', 'wcbom' ) } onRequestClose={ onClose }>
+			: __( 'New purchase order', 'pv-bom-stock' ) } onRequestClose={ onClose }>
 			{ error && (
 				<Notice status="error" isDismissible={ false }>
 					{ error }
@@ -381,10 +381,10 @@ function PurchaseOrderModal( { restNamespace, order, onClose, onSaved } ) {
 
 			<Field>
 				<SelectControl
-					label={ __( 'Vendor', 'wcbom' ) }
+					label={ __( 'Vendor', 'pv-bom-stock' ) }
 					value={ vendorId }
 					options={ [
-						{ label: __( '— choose —', 'wcbom' ), value: '' },
+						{ label: __( '— choose —', 'pv-bom-stock' ), value: '' },
 						...vendors.map( ( v ) => ( { label: v.name, value: String( v.vendor_id ) } ) ),
 					] }
 					onChange={ setVendorId }
@@ -394,13 +394,13 @@ function PurchaseOrderModal( { restNamespace, order, onClose, onSaved } ) {
 
 			{ 0 === vendors.length && (
 				<Notice status="warning" isDismissible={ false }>
-					{ __( 'No vendors yet — add one on the Vendors tab first.', 'wcbom' ) }
+					{ __( 'No vendors yet — add one on the Vendors tab first.', 'pv-bom-stock' ) }
 				</Notice>
 			) }
 
 			<Field>
 				<TextControl
-					label={ __( 'Vendor reference / invoice # (optional)', 'wcbom' ) }
+					label={ __( 'Vendor reference / invoice # (optional)', 'pv-bom-stock' ) }
 					value={ reference }
 					onChange={ setReference }
 					__next40pxDefaultSize
@@ -409,7 +409,7 @@ function PurchaseOrderModal( { restNamespace, order, onClose, onSaved } ) {
 
 			<Field>
 				<TextControl
-					label={ __( 'Expected date (optional)', 'wcbom' ) }
+					label={ __( 'Expected date (optional)', 'pv-bom-stock' ) }
 					type="date"
 					value={ expectedDate }
 					onChange={ setExpectedDate }
@@ -417,13 +417,13 @@ function PurchaseOrderModal( { restNamespace, order, onClose, onSaved } ) {
 				/>
 			</Field>
 
-			<p><strong>{ __( 'Line items:', 'wcbom' ) }</strong></p>
+			<p><strong>{ __( 'Line items:', 'pv-bom-stock' ) }</strong></p>
 			<table className="widefat" style={ { marginBottom: '8px' } }>
 				<thead>
 					<tr>
-						<th>{ __( 'Component', 'wcbom' ) }</th>
-						<th>{ __( 'Qty', 'wcbom' ) }</th>
-						<th>{ __( 'Unit cost (optional)', 'wcbom' ) }</th>
+						<th>{ __( 'Component', 'pv-bom-stock' ) }</th>
+						<th>{ __( 'Qty', 'pv-bom-stock' ) }</th>
+						<th>{ __( 'Unit cost (optional)', 'pv-bom-stock' ) }</th>
 						<th></th>
 					</tr>
 				</thead>
@@ -453,14 +453,14 @@ function PurchaseOrderModal( { restNamespace, order, onClose, onSaved } ) {
 							</td>
 							<td>
 								<Button variant="tertiary" isDestructive onClick={ () => removeLine( index ) }>
-									{ __( 'Remove', 'wcbom' ) }
+									{ __( 'Remove', 'pv-bom-stock' ) }
 								</Button>
 							</td>
 						</tr>
 					) ) }
 					{ 0 === lines.length && (
 						<tr>
-							<td colSpan={ 4 }>{ __( 'No lines yet.', 'wcbom' ) }</td>
+							<td colSpan={ 4 }>{ __( 'No lines yet.', 'pv-bom-stock' ) }</td>
 						</tr>
 					) }
 				</tbody>
@@ -472,7 +472,7 @@ function PurchaseOrderModal( { restNamespace, order, onClose, onSaved } ) {
 
 			<Field>
 				<TextareaControl
-					label={ __( 'Notes (optional)', 'wcbom' ) }
+					label={ __( 'Notes (optional)', 'pv-bom-stock' ) }
 					value={ notes }
 					onChange={ setNotes }
 					__nextHasNoMarginBottom
@@ -481,10 +481,10 @@ function PurchaseOrderModal( { restNamespace, order, onClose, onSaved } ) {
 
 			<p>
 				<Button variant="primary" isBusy={ submitting } disabled={ submitting } onClick={ submit }>
-					{ isEdit ? __( 'Save', 'wcbom' ) : __( 'Create draft', 'wcbom' ) }
+					{ isEdit ? __( 'Save', 'pv-bom-stock' ) : __( 'Create draft', 'pv-bom-stock' ) }
 				</Button>{ ' ' }
 				<Button variant="tertiary" disabled={ submitting } onClick={ onClose }>
-					{ __( 'Cancel', 'wcbom' ) }
+					{ __( 'Cancel', 'pv-bom-stock' ) }
 				</Button>
 			</p>
 		</Modal>
@@ -511,7 +511,7 @@ function ReceiveModal( { restNamespace, order, onClose, onReceived } ) {
 		}
 
 		if ( 0 === Object.keys( receipts ).length ) {
-			setError( __( 'Enter a received quantity for at least one line.', 'wcbom' ) );
+			setError( __( 'Enter a received quantity for at least one line.', 'pv-bom-stock' ) );
 			return;
 		}
 
@@ -529,7 +529,7 @@ function ReceiveModal( { restNamespace, order, onClose, onReceived } ) {
 	return (
 		<Modal title={ sprintf(
 			/* translators: %d: purchase order ID */
-			__( 'Receive PO #%d', 'wcbom' ),
+			__( 'Receive PO #%d', 'pv-bom-stock' ),
 			order.po_id
 		) } onRequestClose={ onClose }>
 			{ error && (
@@ -541,10 +541,10 @@ function ReceiveModal( { restNamespace, order, onClose, onReceived } ) {
 			<table className="widefat">
 				<thead>
 					<tr>
-						<th>{ __( 'Component', 'wcbom' ) }</th>
-						<th>{ __( 'Ordered', 'wcbom' ) }</th>
-						<th>{ __( 'Received so far', 'wcbom' ) }</th>
-						<th>{ __( 'Receiving now', 'wcbom' ) }</th>
+						<th>{ __( 'Component', 'pv-bom-stock' ) }</th>
+						<th>{ __( 'Ordered', 'pv-bom-stock' ) }</th>
+						<th>{ __( 'Received so far', 'pv-bom-stock' ) }</th>
+						<th>{ __( 'Receiving now', 'pv-bom-stock' ) }</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -570,15 +570,15 @@ function ReceiveModal( { restNamespace, order, onClose, onReceived } ) {
 			</table>
 
 			<p className="description">
-				{ __( 'Receiving more than what\'s outstanding is fine — vendors sometimes ship extra.', 'wcbom' ) }
+				{ __( 'Receiving more than what\'s outstanding is fine — vendors sometimes ship extra.', 'pv-bom-stock' ) }
 			</p>
 
 			<p>
 				<Button variant="primary" isBusy={ submitting } disabled={ submitting } onClick={ submit }>
-					{ __( 'Record receipt', 'wcbom' ) }
+					{ __( 'Record receipt', 'pv-bom-stock' ) }
 				</Button>{ ' ' }
 				<Button variant="tertiary" disabled={ submitting } onClick={ onClose }>
-					{ __( 'Cancel', 'wcbom' ) }
+					{ __( 'Cancel', 'pv-bom-stock' ) }
 				</Button>
 			</p>
 		</Modal>
@@ -616,7 +616,7 @@ function CostsModal( { restNamespace, order, onClose, onSaved } ) {
 	return (
 		<Modal title={ sprintf(
 			/* translators: %d: purchase order ID */
-			__( 'Edit costs — PO #%d', 'wcbom' ),
+			__( 'Edit costs — PO #%d', 'pv-bom-stock' ),
 			order.po_id
 		) } onRequestClose={ onClose }>
 			{ error && (
@@ -626,12 +626,12 @@ function CostsModal( { restNamespace, order, onClose, onSaved } ) {
 			) }
 
 			<p className="description">
-				{ __( 'Freight, tax, and other fees are amortized across this PO\'s line items proportional to their ordered value, for a landed-cost view on the PO detail — never written to any product\'s price.', 'wcbom' ) }
+				{ __( 'Freight, tax, and other fees are amortized across this PO\'s line items proportional to their ordered value, for a landed-cost view on the PO detail — never written to any product\'s price.', 'pv-bom-stock' ) }
 			</p>
 
 			<Field>
 				<TextControl
-					label={ __( 'Freight / shipping', 'wcbom' ) }
+					label={ __( 'Freight / shipping', 'pv-bom-stock' ) }
 					type="number"
 					step="0.01"
 					value={ freight }
@@ -641,7 +641,7 @@ function CostsModal( { restNamespace, order, onClose, onSaved } ) {
 			</Field>
 			<Field>
 				<TextControl
-					label={ __( 'Tax', 'wcbom' ) }
+					label={ __( 'Tax', 'pv-bom-stock' ) }
 					type="number"
 					step="0.01"
 					value={ tax }
@@ -651,7 +651,7 @@ function CostsModal( { restNamespace, order, onClose, onSaved } ) {
 			</Field>
 			<Field>
 				<TextControl
-					label={ __( 'Other fees', 'wcbom' ) }
+					label={ __( 'Other fees', 'pv-bom-stock' ) }
 					type="number"
 					step="0.01"
 					value={ fees }
@@ -662,10 +662,10 @@ function CostsModal( { restNamespace, order, onClose, onSaved } ) {
 
 			<p>
 				<Button variant="primary" isBusy={ submitting } disabled={ submitting } onClick={ submit }>
-					{ __( 'Save', 'wcbom' ) }
+					{ __( 'Save', 'pv-bom-stock' ) }
 				</Button>{ ' ' }
 				<Button variant="tertiary" disabled={ submitting } onClick={ onClose }>
-					{ __( 'Cancel', 'wcbom' ) }
+					{ __( 'Cancel', 'pv-bom-stock' ) }
 				</Button>
 			</p>
 		</Modal>
@@ -699,7 +699,7 @@ function SendModal( { restNamespace, order, onClose, onSent } ) {
 	return (
 		<Modal title={ sprintf(
 			/* translators: %d: purchase order ID */
-			__( 'Send PO #%d', 'wcbom' ),
+			__( 'Send PO #%d', 'pv-bom-stock' ),
 			order.po_id
 		) } onRequestClose={ onClose }>
 			{ error && (
@@ -709,14 +709,14 @@ function SendModal( { restNamespace, order, onClose, onSent } ) {
 			) }
 
 			<p className="description">
-				{ __( 'Sends a plain-text summary of this purchase order\'s details to whichever email address(es) below are on file.', 'wcbom' ) }
+				{ __( 'Sends a plain-text summary of this purchase order\'s details to whichever email address(es) below are on file.', 'pv-bom-stock' ) }
 			</p>
 
 			<Field>
 				<CheckboxControl
 					label={ sprintf(
 						/* translators: %s: vendor name */
-						__( 'Send to vendor (%s)', 'wcbom' ),
+						__( 'Send to vendor (%s)', 'pv-bom-stock' ),
 						order.vendor_name
 					) }
 					checked={ toVendor }
@@ -725,7 +725,7 @@ function SendModal( { restNamespace, order, onClose, onSent } ) {
 			</Field>
 			<Field>
 				<CheckboxControl
-					label={ __( 'Send a copy to myself', 'wcbom' ) }
+					label={ __( 'Send a copy to myself', 'pv-bom-stock' ) }
 					checked={ toMyself }
 					onChange={ setToMyself }
 				/>
@@ -733,10 +733,10 @@ function SendModal( { restNamespace, order, onClose, onSent } ) {
 
 			<p>
 				<Button variant="primary" isBusy={ submitting } disabled={ submitting || ( ! toVendor && ! toMyself ) } onClick={ submit }>
-					{ __( 'Send', 'wcbom' ) }
+					{ __( 'Send', 'pv-bom-stock' ) }
 				</Button>{ ' ' }
 				<Button variant="tertiary" disabled={ submitting } onClick={ onClose }>
-					{ __( 'Cancel', 'wcbom' ) }
+					{ __( 'Cancel', 'pv-bom-stock' ) }
 				</Button>
 			</p>
 		</Modal>
@@ -750,14 +750,14 @@ function ViewModal( { order, onClose } ) {
 	return (
 		<Modal title={ sprintf(
 			/* translators: 1: purchase order ID, 2: vendor name */
-			__( 'PO #%1$d — %2$s', 'wcbom' ),
+			__( 'PO #%1$d — %2$s', 'pv-bom-stock' ),
 			order.po_id,
 			order.vendor_name
 		) } onRequestClose={ onClose }>
 			<p>{ PO_STATUS_LABELS[ order.status ] || order.status }</p>
 			{ order.reference && <p>{ sprintf(
 				/* translators: %s: vendor reference/invoice number */
-				__( 'Reference: %s', 'wcbom' ),
+				__( 'Reference: %s', 'pv-bom-stock' ),
 				order.reference
 			) }</p> }
 			{ order.notes && <p>{ order.notes }</p> }
@@ -765,11 +765,11 @@ function ViewModal( { order, onClose } ) {
 			<table className="widefat">
 				<thead>
 					<tr>
-						<th>{ __( 'Component', 'wcbom' ) }</th>
-						<th>{ __( 'Ordered', 'wcbom' ) }</th>
-						<th>{ __( 'Received', 'wcbom' ) }</th>
-						<th>{ __( 'Unit cost', 'wcbom' ) }</th>
-						{ hasFees && <th>{ __( 'Landed unit cost', 'wcbom' ) }</th> }
+						<th>{ __( 'Component', 'pv-bom-stock' ) }</th>
+						<th>{ __( 'Ordered', 'pv-bom-stock' ) }</th>
+						<th>{ __( 'Received', 'pv-bom-stock' ) }</th>
+						<th>{ __( 'Unit cost', 'pv-bom-stock' ) }</th>
+						{ hasFees && <th>{ __( 'Landed unit cost', 'pv-bom-stock' ) }</th> }
 					</tr>
 				</thead>
 				<tbody>
@@ -791,19 +791,19 @@ function ViewModal( { order, onClose } ) {
 				<p className="description">
 					{ sprintf(
 						/* translators: 1: freight cost, 2: tax cost, 3: other fees, 4: total */
-						__( 'Freight $%1$s + tax $%2$s + fees $%3$s = $%4$s amortized across lines by ordered value.', 'wcbom' ),
+						__( 'Freight $%1$s + tax $%2$s + fees $%3$s = $%4$s amortized across lines by ordered value.', 'pv-bom-stock' ),
 						formatNumber( order.freight_cost || 0 ),
 						formatNumber( order.tax_cost || 0 ),
 						formatNumber( order.fees_cost || 0 ),
 						formatNumber( order.total_fees )
 					) }
-					{ someMissingCost && ' ' + __( 'Lines with no unit cost entered show "—" for landed cost — enter a unit cost on them for a complete breakdown.', 'wcbom' ) }
+					{ someMissingCost && ' ' + __( 'Lines with no unit cost entered show "—" for landed cost — enter a unit cost on them for a complete breakdown.', 'pv-bom-stock' ) }
 				</p>
 			) }
 
 			<p>
 				<Button variant="tertiary" onClick={ onClose }>
-					{ __( 'Close', 'wcbom' ) }
+					{ __( 'Close', 'pv-bom-stock' ) }
 				</Button>
 			</p>
 		</Modal>
@@ -829,7 +829,7 @@ function VendorsTab( { restNamespace } ) {
 	function archive( vendor ) {
 		if ( ! window.confirm( sprintf(
 			/* translators: %s: vendor name */
-			__( 'Archive "%s"? Its purchase-order history is kept, but it won\'t appear when creating a new PO.', 'wcbom' ),
+			__( 'Archive "%s"? Its purchase-order history is kept, but it won\'t appear when creating a new PO.', 'pv-bom-stock' ),
 			vendor.name
 		) ) ) {
 			return;
@@ -837,7 +837,7 @@ function VendorsTab( { restNamespace } ) {
 
 		apiFetch( { path: `/${ restNamespace }/vendors/${ vendor.vendor_id }`, method: 'DELETE' } )
 			.then( () => {
-				setNotice( { status: 'success', message: __( 'Vendor archived.', 'wcbom' ) } );
+				setNotice( { status: 'success', message: __( 'Vendor archived.', 'pv-bom-stock' ) } );
 				load();
 			} )
 			.catch( ( err ) => setNotice( { status: 'error', message: err.message || String( err ) } ) );
@@ -845,7 +845,7 @@ function VendorsTab( { restNamespace } ) {
 
 	function onSaved() {
 		setEditVendor( null );
-		setNotice( { status: 'success', message: __( 'Vendor saved.', 'wcbom' ) } );
+		setNotice( { status: 'success', message: __( 'Vendor saved.', 'pv-bom-stock' ) } );
 		load();
 	}
 
@@ -859,7 +859,7 @@ function VendorsTab( { restNamespace } ) {
 
 			<p>
 				<Button variant="primary" onClick={ () => setEditVendor( {} ) }>
-					{ __( '+ New vendor', 'wcbom' ) }
+					{ __( '+ New vendor', 'pv-bom-stock' ) }
 				</Button>
 			</p>
 
@@ -869,10 +869,10 @@ function VendorsTab( { restNamespace } ) {
 				<table className="widefat wcbom-vendor-table">
 					<thead>
 						<tr>
-							<th>{ __( 'Name', 'wcbom' ) }</th>
-							<th>{ __( 'Email', 'wcbom' ) }</th>
-							<th>{ __( 'Phone', 'wcbom' ) }</th>
-							<th>{ __( 'Status', 'wcbom' ) }</th>
+							<th>{ __( 'Name', 'pv-bom-stock' ) }</th>
+							<th>{ __( 'Email', 'pv-bom-stock' ) }</th>
+							<th>{ __( 'Phone', 'pv-bom-stock' ) }</th>
+							<th>{ __( 'Status', 'pv-bom-stock' ) }</th>
 							<th></th>
 						</tr>
 					</thead>
@@ -882,14 +882,14 @@ function VendorsTab( { restNamespace } ) {
 								<td>{ vendor.name }</td>
 								<td>{ vendor.email || '—' }</td>
 								<td>{ vendor.phone || '—' }</td>
-								<td>{ vendor.is_active ? __( 'Active', 'wcbom' ) : __( 'Archived', 'wcbom' ) }</td>
+								<td>{ vendor.is_active ? __( 'Active', 'pv-bom-stock' ) : __( 'Archived', 'pv-bom-stock' ) }</td>
 								<td>
 									<Button variant="secondary" onClick={ () => setEditVendor( vendor ) }>
-										{ __( 'Edit', 'wcbom' ) }
+										{ __( 'Edit', 'pv-bom-stock' ) }
 									</Button>{ ' ' }
 									{ vendor.is_active && (
 										<Button variant="tertiary" isDestructive onClick={ () => archive( vendor ) }>
-											{ __( 'Archive', 'wcbom' ) }
+											{ __( 'Archive', 'pv-bom-stock' ) }
 										</Button>
 									) }
 								</td>
@@ -897,7 +897,7 @@ function VendorsTab( { restNamespace } ) {
 						) ) }
 						{ 0 === vendors.length && (
 							<tr>
-								<td colSpan={ 5 }>{ __( 'No vendors yet.', 'wcbom' ) }</td>
+								<td colSpan={ 5 }>{ __( 'No vendors yet.', 'pv-bom-stock' ) }</td>
 							</tr>
 						) }
 					</tbody>
@@ -925,7 +925,7 @@ function VendorModal( { restNamespace, vendor, onClose, onSaved } ) {
 		setError( null );
 
 		if ( ! name.trim() ) {
-			setError( __( 'A vendor name is required.', 'wcbom' ) );
+			setError( __( 'A vendor name is required.', 'pv-bom-stock' ) );
 			return;
 		}
 
@@ -940,7 +940,7 @@ function VendorModal( { restNamespace, vendor, onClose, onSaved } ) {
 	}
 
 	return (
-		<Modal title={ isEdit ? __( 'Edit vendor', 'wcbom' ) : __( 'New vendor', 'wcbom' ) } onRequestClose={ onClose }>
+		<Modal title={ isEdit ? __( 'Edit vendor', 'pv-bom-stock' ) : __( 'New vendor', 'pv-bom-stock' ) } onRequestClose={ onClose }>
 			{ error && (
 				<Notice status="error" isDismissible={ false }>
 					{ error }
@@ -948,27 +948,27 @@ function VendorModal( { restNamespace, vendor, onClose, onSaved } ) {
 			) }
 
 			<Field>
-				<TextControl label={ __( 'Name', 'wcbom' ) } value={ name } onChange={ setName } __next40pxDefaultSize />
+				<TextControl label={ __( 'Name', 'pv-bom-stock' ) } value={ name } onChange={ setName } __next40pxDefaultSize />
 			</Field>
 			<Field>
-				<TextControl label={ __( 'Email', 'wcbom' ) } type="email" value={ email } onChange={ setEmail } __next40pxDefaultSize />
+				<TextControl label={ __( 'Email', 'pv-bom-stock' ) } type="email" value={ email } onChange={ setEmail } __next40pxDefaultSize />
 			</Field>
 			<Field>
-				<TextControl label={ __( 'Phone', 'wcbom' ) } value={ phone } onChange={ setPhone } __next40pxDefaultSize />
+				<TextControl label={ __( 'Phone', 'pv-bom-stock' ) } value={ phone } onChange={ setPhone } __next40pxDefaultSize />
 			</Field>
 			<Field>
-				<TextControl label={ __( 'Website', 'wcbom' ) } type="url" value={ website } onChange={ setWebsite } __next40pxDefaultSize />
+				<TextControl label={ __( 'Website', 'pv-bom-stock' ) } type="url" value={ website } onChange={ setWebsite } __next40pxDefaultSize />
 			</Field>
 			<Field>
-				<TextareaControl label={ __( 'Notes', 'wcbom' ) } value={ notes } onChange={ setNotes } __nextHasNoMarginBottom />
+				<TextareaControl label={ __( 'Notes', 'pv-bom-stock' ) } value={ notes } onChange={ setNotes } __nextHasNoMarginBottom />
 			</Field>
 
 			<p>
 				<Button variant="primary" isBusy={ submitting } disabled={ submitting } onClick={ submit }>
-					{ __( 'Save', 'wcbom' ) }
+					{ __( 'Save', 'pv-bom-stock' ) }
 				</Button>{ ' ' }
 				<Button variant="tertiary" disabled={ submitting } onClick={ onClose }>
-					{ __( 'Cancel', 'wcbom' ) }
+					{ __( 'Cancel', 'pv-bom-stock' ) }
 				</Button>
 			</p>
 		</Modal>

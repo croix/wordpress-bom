@@ -59,7 +59,7 @@ final class ProductBomMetabox {
 	 */
 	public function add_tab( array $tabs ): array {
 		$tabs['wcbom'] = array(
-			'label'    => __( 'Bill of Materials', 'wcbom' ),
+			'label'    => __( 'Bill of Materials', 'pv-bom-stock' ),
 			'target'   => 'wcbom_bom_data',
 			'class'    => array(),
 			'priority' => 65,
@@ -90,11 +90,11 @@ final class ProductBomMetabox {
 		woocommerce_wp_select(
 			array(
 				'id'      => '_wcbom_mode',
-				'label'   => __( 'Stock mode', 'wcbom' ),
+				'label'   => __( 'Stock mode', 'pv-bom-stock' ),
 				'options' => array(
-					'standard'      => __( 'Standard (WooCommerce native stock)', 'wcbom' ),
-					'made_to_order' => __( 'Made-to-order (BOM-driven, components consumed on sale)', 'wcbom' ),
-					'manufactured'  => __( 'Manufactured finished good (built via Manufacture Orders)', 'wcbom' ),
+					'standard'      => __( 'Standard (WooCommerce native stock)', 'pv-bom-stock' ),
+					'made_to_order' => __( 'Made-to-order (BOM-driven, components consumed on sale)', 'pv-bom-stock' ),
+					'manufactured'  => __( 'Manufactured finished good (built via Manufacture Orders)', 'pv-bom-stock' ),
 				),
 				'value'   => $mode,
 			)
@@ -103,8 +103,8 @@ final class ProductBomMetabox {
 		woocommerce_wp_checkbox(
 			array(
 				'id'          => '_wcbom_is_component',
-				'label'       => __( 'Component', 'wcbom' ),
-				'description' => __( 'This product can be used as a raw material in another product\'s BOM.', 'wcbom' ),
+				'label'       => __( 'Component', 'pv-bom-stock' ),
+				'description' => __( 'This product can be used as a raw material in another product\'s BOM.', 'pv-bom-stock' ),
 				'value'       => $is_component ? 'yes' : 'no',
 			)
 		);
@@ -112,13 +112,13 @@ final class ProductBomMetabox {
 		woocommerce_wp_select(
 			array(
 				'id'      => '_wcbom_unit',
-				'label'   => __( 'Component unit', 'wcbom' ),
+				'label'   => __( 'Component unit', 'pv-bom-stock' ),
 				'options' => array(
-					'ea'    => __( 'Each', 'wcbom' ),
-					'g'     => __( 'Grams', 'wcbom' ),
-					'ml'    => __( 'Milliliters', 'wcbom' ),
-					'cm'    => __( 'Centimeters', 'wcbom' ),
-					'sheet' => __( 'Sheets', 'wcbom' ),
+					'ea'    => __( 'Each', 'pv-bom-stock' ),
+					'g'     => __( 'Grams', 'pv-bom-stock' ),
+					'ml'    => __( 'Milliliters', 'pv-bom-stock' ),
+					'cm'    => __( 'Centimeters', 'pv-bom-stock' ),
+					'sheet' => __( 'Sheets', 'pv-bom-stock' ),
 				),
 				'value'   => $unit,
 			)
@@ -127,8 +127,8 @@ final class ProductBomMetabox {
 		woocommerce_wp_checkbox(
 			array(
 				'id'          => '_wcbom_weight_from_bom',
-				'label'       => __( 'Weight from BOM', 'wcbom' ),
-				'description' => __( 'Override this product\'s cart/shipping weight with the sum of its resolved BOM lines\' component weights (Σ weight × qty), instead of the Shipping tab\'s fixed weight field. Leave unchecked for premade/manufactured products that already have a correct fixed weight.', 'wcbom' ),
+				'label'       => __( 'Weight from BOM', 'pv-bom-stock' ),
+				'description' => __( 'Override this product\'s cart/shipping weight with the sum of its resolved BOM lines\' component weights (Σ weight × qty), instead of the Shipping tab\'s fixed weight field. Leave unchecked for premade/manufactured products that already have a correct fixed weight.', 'pv-bom-stock' ),
 				'value'       => $weight_from_bom ? 'yes' : 'no',
 			)
 		);
@@ -136,8 +136,8 @@ final class ProductBomMetabox {
 		woocommerce_wp_checkbox(
 			array(
 				'id'          => '_wcbom_cogs_from_bom',
-				'label'       => __( 'Cost of Goods Sold from BOM', 'wcbom' ),
-				'description' => __( 'When WooCommerce\'s Cost of Goods Sold feature is enabled, report this product\'s BOM cost instead of the (empty, unless typed) Cost field below on the Advanced tab. Leave unchecked if you\'d rather type a cost by hand — for example to include overhead this plugin doesn\'t model.', 'wcbom' ),
+				'label'       => __( 'Cost of Goods Sold from BOM', 'pv-bom-stock' ),
+				'description' => __( 'When WooCommerce\'s Cost of Goods Sold feature is enabled, report this product\'s BOM cost instead of the (empty, unless typed) Cost field below on the Advanced tab. Leave unchecked if you\'d rather type a cost by hand — for example to include overhead this plugin doesn\'t model.', 'pv-bom-stock' ),
 				'value'       => $cogs_from_bom ? 'yes' : 'no',
 			)
 		);
@@ -151,7 +151,7 @@ final class ProductBomMetabox {
 		}
 
 		echo '<div class="options_group" id="wcbom-bom-editor-root" data-product-id="' . esc_attr( (string) $product_id ) . '">';
-		echo '<p class="description">' . esc_html__( 'Loading BOM editor…', 'wcbom' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'Loading BOM editor…', 'pv-bom-stock' ) . '</p>';
 		echo '</div>';
 		echo '</div>';
 	}
@@ -167,10 +167,10 @@ final class ProductBomMetabox {
 		$used_in = $this->boms->used_in( $component_id );
 
 		echo '<div class="options_group">';
-		echo '<p><strong>' . esc_html__( 'Used in', 'wcbom' ) . ':</strong> ';
+		echo '<p><strong>' . esc_html__( 'Used in', 'pv-bom-stock' ) . ':</strong> ';
 
 		if ( array() === $used_in ) {
-			echo esc_html__( 'Not used in any active BOM.', 'wcbom' );
+			echo esc_html__( 'Not used in any active BOM.', 'pv-bom-stock' );
 		} else {
 			$links = array_map(
 				static fn( array $row ): string => sprintf(
@@ -207,12 +207,12 @@ final class ProductBomMetabox {
 		$cost    = $this->cogs_hint_cost( $product_id, $bom );
 		$message = sprintf(
 			/* translators: %s: formatted cost, including the store's currency symbol. */
-			__( 'Cost from BOM: %s (used for WooCommerce Cost of Goods Sold reporting, when enabled and the box above is checked).', 'wcbom' ),
+			__( 'Cost from BOM: %s (used for WooCommerce Cost of Goods Sold reporting, when enabled and the box above is checked).', 'pv-bom-stock' ),
 			wc_price( $cost )
 		);
 
 		if ( count( $bom->items ) > count( $bom->always_items() ) ) {
-			$message .= ' ' . __( 'This BOM has option-conditional lines, so the actual cost varies by the customer\'s selection — this figure covers always-consumed lines only.', 'wcbom' );
+			$message .= ' ' . __( 'This BOM has option-conditional lines, so the actual cost varies by the customer\'s selection — this figure covers always-consumed lines only.', 'pv-bom-stock' );
 		}
 
 		echo '<p class="description" style="margin-left:150px;">';

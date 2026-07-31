@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
-<ruleset name="wc-bom-stock">
-    <description>WPCS-Extra coding standard for wc-bom-stock.</description>
+<ruleset name="pv-bom-stock">
+    <description>WPCS-Extra coding standard for pv-bom-stock.</description>
 
     <file>.</file>
     <exclude-pattern>/vendor/*</exclude-pattern>
@@ -27,7 +27,7 @@
     <rule ref="WordPress.WP.I18n">
         <properties>
             <property name="text_domain" type="array">
-                <element value="wcbom"/>
+                <element value="pv-bom-stock"/>
             </property>
         </properties>
     </rule>

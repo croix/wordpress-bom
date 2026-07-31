@@ -35,7 +35,7 @@ tests_add_filter(
 	'muplugins_loaded',
 	static function () use ( $plugin_root ) {
 		require '/var/www/html/wp-content/plugins/woocommerce/woocommerce.php';
-		require $plugin_root . '/wc-bom-stock.php';
+		require $plugin_root . '/pv-bom-stock.php';
 	}
 );
 

@@ -157,7 +157,7 @@ final class ManufactureApi {
 	public function get_order( WP_REST_Request $request ) {
 		$mo = $this->orders->get( (int) $request->get_param( 'id' ) );
 		if ( null === $mo ) {
-			return new WP_Error( 'wcbom_mo_not_found', __( 'Unknown manufacture order.', 'wcbom' ), array( 'status' => 404 ) );
+			return new WP_Error( 'wcbom_mo_not_found', __( 'Unknown manufacture order.', 'pv-bom-stock' ), array( 'status' => 404 ) );
 		}
 
 		return new WP_REST_Response( array( 'order' => $this->present_order( $mo ) ) );
@@ -176,14 +176,14 @@ final class ManufactureApi {
 		$notes     = (string) $request->get_param( 'notes' );
 
 		if ( $qty_built <= 0 ) {
-			return new WP_Error( 'wcbom_invalid_qty', __( 'qty_built must be a positive integer.', 'wcbom' ), array( 'status' => 400 ) );
+			return new WP_Error( 'wcbom_invalid_qty', __( 'qty_built must be a positive integer.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 		}
 
 		try {
 			if ( 'existing' === $mode ) {
 				$product_id = (int) $request->get_param( 'product_id' );
 				if ( $product_id <= 0 ) {
-					return new WP_Error( 'wcbom_invalid_product', __( 'product_id is required.', 'wcbom' ), array( 'status' => 400 ) );
+					return new WP_Error( 'wcbom_invalid_product', __( 'product_id is required.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 				}
 				$mo = $this->manufacture->create_draft_for_existing( $product_id, $qty_built, '' !== $notes ? $notes : null );
 			} elseif ( 'template' === $mode ) {
@@ -193,12 +193,12 @@ final class ManufactureApi {
 				$attributes  = $request->get_param( 'attributes' );
 
 				if ( $template_id <= 0 || '' === $title || ! is_array( $attributes ) ) {
-					return new WP_Error( 'wcbom_invalid_template_request', __( 'template_product_id, title, and attributes are required.', 'wcbom' ), array( 'status' => 400 ) );
+					return new WP_Error( 'wcbom_invalid_template_request', __( 'template_product_id, title, and attributes are required.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 				}
 
 				$mo = $this->manufacture->create_draft_from_template( $template_id, $title, $price, $attributes, $qty_built, '' !== $notes ? $notes : null );
 			} else {
-				return new WP_Error( 'wcbom_invalid_mode', __( 'mode must be "existing" or "template".', 'wcbom' ), array( 'status' => 400 ) );
+				return new WP_Error( 'wcbom_invalid_mode', __( 'mode must be "existing" or "template".', 'pv-bom-stock' ), array( 'status' => 400 ) );
 			}
 		} catch ( \RuntimeException $e ) {
 			return new WP_Error( 'wcbom_mo_create_failed', $e->getMessage(), array( 'status' => 400 ) );
@@ -216,7 +216,7 @@ final class ManufactureApi {
 	public function complete( WP_REST_Request $request ) {
 		$op_key = (string) $request->get_param( 'op_key' );
 		if ( '' === $op_key ) {
-			return new WP_Error( 'wcbom_missing_op_key', __( 'Missing op_key.', 'wcbom' ), array( 'status' => 400 ) );
+			return new WP_Error( 'wcbom_missing_op_key', __( 'Missing op_key.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 		}
 
 		try {
@@ -243,7 +243,7 @@ final class ManufactureApi {
 	public function reverse( WP_REST_Request $request ) {
 		$op_key = (string) $request->get_param( 'op_key' );
 		if ( '' === $op_key ) {
-			return new WP_Error( 'wcbom_missing_op_key', __( 'Missing op_key.', 'wcbom' ), array( 'status' => 400 ) );
+			return new WP_Error( 'wcbom_missing_op_key', __( 'Missing op_key.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 		}
 
 		$scrap = $request->get_param( 'scrap_component_ids' );
@@ -274,7 +274,7 @@ final class ManufactureApi {
 	public function delete_draft( WP_REST_Request $request ) {
 		$deleted = $this->manufacture->delete_draft( (int) $request->get_param( 'id' ) );
 		if ( ! $deleted ) {
-			return new WP_Error( 'wcbom_mo_delete_failed', __( 'Only draft manufacture orders can be deleted.', 'wcbom' ), array( 'status' => 400 ) );
+			return new WP_Error( 'wcbom_mo_delete_failed', __( 'Only draft manufacture orders can be deleted.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 		}
 
 		return new WP_REST_Response( array( 'deleted' => true ) );

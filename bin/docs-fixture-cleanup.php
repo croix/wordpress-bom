@@ -35,16 +35,16 @@ $demo_product_ids = $wpdb->get_col( "SELECT ID FROM {$wpdb->posts} WHERE post_ti
 if ( array() !== $demo_product_ids ) {
 	$placeholders = implode( ',', array_fill( 0, count( $demo_product_ids ), '%d' ) );
 
-	// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- built via $wpdb->prepare() with a dynamic IN() list, the documented pattern for this.
 	$wpdb->query(
 		$wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- built via $wpdb->prepare() with a dynamic IN() list, the documented pattern for this.
 			"DELETE FROM {$wpdb->prefix}wcbom_bom_items WHERE bom_id IN (SELECT bom_id FROM {$wpdb->prefix}wcbom_boms WHERE product_id IN ({$placeholders}))",
 			$demo_product_ids
 		)
 	);
-	// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- built via $wpdb->prepare() with a dynamic IN() list, the documented pattern for this.
 	$wpdb->query(
 		$wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- built via $wpdb->prepare() with a dynamic IN() list, the documented pattern for this.
 			"DELETE FROM {$wpdb->prefix}wcbom_boms WHERE product_id IN ({$placeholders})",
 			$demo_product_ids
 		)

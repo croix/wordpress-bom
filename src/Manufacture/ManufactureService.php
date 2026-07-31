@@ -62,7 +62,7 @@ final class ManufactureService {
 	public function create_draft_for_existing( int $product_id, int $qty_built, ?string $notes ): ManufactureOrder {
 		$bom = $this->boms->get_active_for_product( $product_id );
 		if ( null === $bom ) {
-			throw new \RuntimeException( esc_html__( 'This product has no active BOM.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'This product has no active BOM.', 'pv-bom-stock' ) );
 		}
 
 		$mo_id = $this->orders->create_draft( $product_id, $bom->bom_id, $qty_built, $notes, get_current_user_id() );
@@ -126,7 +126,7 @@ final class ManufactureService {
 
 		$bom = $this->boms->get( $mo->bom_id );
 		if ( null === $bom || array() === $bom->items ) {
-			throw new \RuntimeException( esc_html__( 'The BOM used for this manufacture order no longer has any lines.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'The BOM used for this manufacture order no longer has any lines.', 'pv-bom-stock' ) );
 		}
 
 		if ( ! $this->guard->claim( $op_key, "Complete MO #{$mo_id}" ) ) {
@@ -197,7 +197,7 @@ final class ManufactureService {
 		$mo = $this->must_get( $mo_id );
 
 		if ( ! in_array( $mo->status, array( ManufactureOrder::STATUS_COMPLETED, ManufactureOrder::STATUS_PARTIALLY_REVERSED ), true ) ) {
-			throw new \RuntimeException( esc_html__( 'This manufacture order cannot be reversed from its current status.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'This manufacture order cannot be reversed from its current status.', 'pv-bom-stock' ) );
 		}
 
 		if ( $qty <= 0 || $qty > $mo->remaining_units() ) {
@@ -205,7 +205,7 @@ final class ManufactureService {
 				esc_html(
 					sprintf(
 						/* translators: %d: units still available to reverse */
-						__( 'Enter between 1 and %d unit(s) to reverse.', 'wcbom' ),
+						__( 'Enter between 1 and %d unit(s) to reverse.', 'pv-bom-stock' ),
 						$mo->remaining_units()
 					)
 				)
@@ -214,7 +214,7 @@ final class ManufactureService {
 
 		$finished = wc_get_product( $mo->product_id );
 		if ( ! $finished || (float) $finished->get_stock_quantity() < $qty ) {
-			throw new \RuntimeException( esc_html__( 'Not enough finished-good stock to reverse — some units may already be sold.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'Not enough finished-good stock to reverse — some units may already be sold.', 'pv-bom-stock' ) );
 		}
 
 		if ( ! $this->guard->claim( $op_key, "Reverse MO #{$mo_id} x{$qty}" ) ) {
@@ -290,7 +290,7 @@ final class ManufactureService {
 	private function must_get( int $mo_id ): ManufactureOrder {
 		$mo = $this->orders->get( $mo_id );
 		if ( null === $mo ) {
-			throw new \RuntimeException( esc_html__( 'Unknown manufacture order.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'Unknown manufacture order.', 'pv-bom-stock' ) );
 		}
 
 		return $mo;

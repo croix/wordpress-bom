@@ -27,7 +27,7 @@ defined( 'ABSPATH' ) || exit;
 final class GitHubUpdater {
 
 	private const REPO          = 'croix/wordpress-bom';
-	private const EXPECTED_SLUG = 'wc-bom-stock';
+	private const EXPECTED_SLUG = 'pv-bom-stock';
 	private const CACHE_KEY     = 'wcbom_update_check';
 	private const CACHE_TTL     = 6 * HOUR_IN_SECONDS;
 
@@ -57,7 +57,7 @@ final class GitHubUpdater {
 			return $update;
 		}
 
-		// The release zip is rooted wc-bom-stock/, and WordPress replaces
+		// The release zip is rooted pv-bom-stock/, and WordPress replaces
 		// the plugin folder using the zip's root name — offering an update
 		// to a differently-named install (like the wp-env dev mount) would
 		// strand the old folder. See BUILD_PLAN.md §14.1.
@@ -121,7 +121,7 @@ final class GitHubUpdater {
 	private function fetch_latest_release(): ?array {
 		$headers = array(
 			'Accept'     => 'application/vnd.github+json',
-			'User-Agent' => 'wc-bom-stock-updater',
+			'User-Agent' => 'pv-bom-stock-updater',
 		);
 
 		if ( defined( 'WCBOM_GITHUB_TOKEN' ) && '' !== WCBOM_GITHUB_TOKEN ) {

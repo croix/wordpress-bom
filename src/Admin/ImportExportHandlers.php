@@ -75,16 +75,29 @@ final class ImportExportHandlers {
 		$redirect_to = wp_get_referer() ? wp_get_referer() : admin_url( 'admin.php?page=wcbom-reports' );
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified via check_admin_referer() in guard() above.
-		if ( ! isset( $_FILES['file'] ) || ! is_array( $_FILES['file'] ) || UPLOAD_ERR_OK !== ( $_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE ) ) {
-			$this->defer_notice( array( __( 'No file was uploaded, or the upload failed.', 'wcbom' ) ), 'error' );
+		$file  = isset( $_FILES['file'] ) && is_array( $_FILES['file'] ) ? $_FILES['file'] : array();
+		$error = isset( $file['error'] ) ? (int) $file['error'] : UPLOAD_ERR_NO_FILE;
+
+		if ( UPLOAD_ERR_OK !== $error || ! isset( $file['tmp_name'] ) ) {
+			$this->defer_notice( array( __( 'No file was uploaded, or the upload failed.', 'pv-bom-stock' ) ), 'error' );
 			wp_safe_redirect( $redirect_to );
 			exit;
 		}
 
-		$tmp_name = (string) $_FILES['file']['tmp_name']; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified via check_admin_referer() in guard() above.
-		$content  = file_get_contents( $tmp_name ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- reading PHP's own upload tmp file, not a remote/user-supplied path.
+		$tmp_name = sanitize_text_field( wp_unslash( (string) $file['tmp_name'] ) );
+
+		// Defense in depth beyond the nonce check above: refuse to read
+		// anything that isn't a file PHP itself just wrote as part of
+		// handling *this* upload, in case $tmp_name were ever forged.
+		if ( ! is_uploaded_file( $tmp_name ) ) {
+			$this->defer_notice( array( __( 'Could not read the uploaded file.', 'pv-bom-stock' ) ), 'error' );
+			wp_safe_redirect( $redirect_to );
+			exit;
+		}
+
+		$content = file_get_contents( $tmp_name ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- reading PHP's own upload tmp file, verified via is_uploaded_file() above, not a remote/user-supplied path.
 		if ( false === $content ) {
-			$this->defer_notice( array( __( 'Could not read the uploaded file.', 'wcbom' ) ), 'error' );
+			$this->defer_notice( array( __( 'Could not read the uploaded file.', 'pv-bom-stock' ) ), 'error' );
 			wp_safe_redirect( $redirect_to );
 			exit;
 		}
@@ -95,14 +108,14 @@ final class ImportExportHandlers {
 		if ( array() !== $result['updated'] ) {
 			$messages[] = sprintf(
 				/* translators: %s: comma-separated product names */
-				__( 'Updated BOMs for: %s.', 'wcbom' ),
+				__( 'Updated BOMs for: %s.', 'pv-bom-stock' ),
 				implode( ', ', $result['updated'] )
 			);
 		}
 		$messages = array_merge( $messages, $result['errors'] );
 
 		if ( array() === $messages ) {
-			$messages[] = __( 'The file had no rows to import.', 'wcbom' );
+			$messages[] = __( 'The file had no rows to import.', 'pv-bom-stock' );
 		}
 
 		$this->defer_notice( $messages, array() === $result['errors'] ? 'success' : 'warning' );
@@ -163,7 +176,7 @@ final class ImportExportHandlers {
 	 */
 	private function guard(): void {
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
-			wp_die( esc_html__( 'You do not have permission to do this.', 'wcbom' ) );
+			wp_die( esc_html__( 'You do not have permission to do this.', 'pv-bom-stock' ) );
 		}
 
 		check_admin_referer( self::NONCE_ACTION );

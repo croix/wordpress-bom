@@ -46,7 +46,7 @@ export default function ComponentPicker( { restNamespace, value, onSelect, onCle
 			<span>
 				{ value.name }{ ' ' }
 				<Button variant="link" onClick={ onClear }>
-					{ __( 'change', 'wcbom' ) }
+					{ __( 'change', 'pv-bom-stock' ) }
 				</Button>
 			</span>
 		);
@@ -64,7 +64,7 @@ export default function ComponentPicker( { restNamespace, value, onSelect, onCle
 						onSelect( found.component );
 					}
 				} }
-				placeholder={ __( 'Search components…', 'wcbom' ) }
+				placeholder={ __( 'Search components…', 'pv-bom-stock' ) }
 				__next40pxDefaultSize
 				__nextHasNoMarginBottom
 			/>
@@ -72,7 +72,7 @@ export default function ComponentPicker( { restNamespace, value, onSelect, onCle
 				<Button variant="link" onClick={ createComponent }>
 					{ sprintf(
 					/* translators: %s: the search term typed, offered as a new component name */
-					__( '+ Create component "%s"', 'wcbom' ),
+					__( '+ Create component "%s"', 'pv-bom-stock' ),
 					term
 				) }
 				</Button>

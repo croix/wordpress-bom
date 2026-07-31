@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Builds the distributable plugin zip into dist/, rooted at wc-bom-stock/
+# Builds the distributable plugin zip into dist/, rooted at pv-bom-stock/
 # (the installed folder name — must never change between releases, see
 # BUILD_PLAN.md §14.4). Run `npm run build` first for fresh JS; the GitHub
 # Actions release workflow does both automatically on tag push.
@@ -9,11 +9,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-SLUG="wc-bom-stock"
-VERSION=$(sed -n 's/^ \* Version:[[:space:]]*//p' wc-bom-stock.php | head -1 | tr -d '[:space:]')
+SLUG="pv-bom-stock"
+VERSION=$(sed -n 's/^ \* Version:[[:space:]]*//p' pv-bom-stock.php | head -1 | tr -d '[:space:]')
 
 if [[ -z "$VERSION" ]]; then
-    echo "ERROR: could not read Version from wc-bom-stock.php" >&2
+    echo "ERROR: could not read Version from pv-bom-stock.php" >&2
     exit 1
 fi
 
@@ -38,18 +38,25 @@ rm -rf dist
 mkdir -p "$STAGE"
 
 # Runtime files only.
-cp wc-bom-stock.php uninstall.php readme.txt "$STAGE/"
+cp pv-bom-stock.php uninstall.php readme.txt "$STAGE/"
 cp -R src "$STAGE/src"
 mkdir -p "$STAGE/assets"
 cp -R assets/build "$STAGE/assets/build"
 cp -R assets/css "$STAGE/assets/css"
 cp -R assets/docs "$STAGE/assets/docs"
 
+# The "Domain Path" plugin header points here — languages/*.pot is
+# deliberately gitignored (regenerated on demand via `wp i18n make-pot`,
+# see CLAUDE.md), but the header still needs a real, existing folder to
+# point at rather than nothing at all.
+mkdir -p "$STAGE/languages"
+
 # Generate the production autoloader (no dev packages — our only runtime
-# dependency is the PSR-4 autoloader itself).
+# dependency is the PSR-4 autoloader itself). composer.json/lock ship
+# alongside vendor/ (not stripped) so anyone auditing the zip can see
+# exactly what (nothing, beyond the PSR-4 autoloader) generated it.
 cp composer.json composer.lock "$STAGE/"
 composer install --no-dev --optimize-autoloader --quiet --working-dir="$STAGE"
-rm "$STAGE/composer.json" "$STAGE/composer.lock"
 
 ( cd dist && zip -rq "$SLUG-$VERSION.zip" "$SLUG" )
 rm -rf "$STAGE"

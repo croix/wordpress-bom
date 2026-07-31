@@ -58,8 +58,8 @@ final class SettingsPage {
 	public function add_menu_page(): void {
 		$this->hook_suffix = add_submenu_page(
 			PluginMenu::SLUG,
-			__( 'Settings', 'wcbom' ),
-			__( 'Settings', 'wcbom' ),
+			__( 'Settings', 'pv-bom-stock' ),
+			__( 'Settings', 'pv-bom-stock' ),
 			'manage_woocommerce',
 			'wcbom-settings',
 			array( $this, 'render_page' )
@@ -77,7 +77,7 @@ final class SettingsPage {
 		if ( isset( $_POST['wcbom_settings_submit'] ) ) {
 			check_admin_referer( self::NONCE_ACTION );
 			WC_Admin_Settings::save_fields( $fields );
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved.', 'wcbom' ) . '</p></div>';
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved.', 'pv-bom-stock' ) . '</p></div>';
 		}
 
 		echo '<div class="wrap">';
@@ -98,45 +98,45 @@ final class SettingsPage {
 	private function fields(): array {
 		return array(
 			array(
-				'title' => __( 'BOM & Stock Manager', 'wcbom' ),
+				'title' => __( 'BOM & Stock Manager', 'pv-bom-stock' ),
 				'type'  => 'title',
 				'id'    => 'wcbom_settings_title',
 			),
 			array(
-				'title'    => __( 'Remove all data on uninstall', 'wcbom' ),
-				'desc'     => __( 'Permanently delete this plugin\'s data when the plugin is deleted from the Plugins screen.', 'wcbom' ),
-				'desc_tip' => __( 'When unchecked (the default), deleting the plugin keeps every BOM, the full stock ledger, and all manufacture-order history in the database, so reinstalling picks up exactly where you left off. Only enable this if you want deletion to permanently erase all of that.', 'wcbom' ),
+				'title'    => __( 'Remove all data on uninstall', 'pv-bom-stock' ),
+				'desc'     => __( 'Permanently delete this plugin\'s data when the plugin is deleted from the Plugins screen.', 'pv-bom-stock' ),
+				'desc_tip' => __( 'When unchecked (the default), deleting the plugin keeps every BOM, the full stock ledger, and all manufacture-order history in the database, so reinstalling picks up exactly where you left off. Only enable this if you want deletion to permanently erase all of that.', 'pv-bom-stock' ),
 				'id'       => 'wcbom_purge_data_on_uninstall',
 				'type'     => 'checkbox',
 				'default'  => 'no',
 			),
 			array(
-				'title'    => __( 'Allow negative component stock', 'wcbom' ),
-				'desc'     => __( 'Let manual inventory adjustments and manufacture orders take a component\'s stock below zero without asking each time.', 'wcbom' ),
-				'desc_tip' => __( 'Applies only to deliberate back-office operations: manual Adjust entries and completing a manufacture order that\'s short a component. Customer orders are unaffected either way — a paid order always consumes its components (going negative if it must) and is flagged for you to reconcile, because refusing a paid order is worse than a stock discrepancy.', 'wcbom' ),
+				'title'    => __( 'Allow negative component stock', 'pv-bom-stock' ),
+				'desc'     => __( 'Let manual inventory adjustments and manufacture orders take a component\'s stock below zero without asking each time.', 'pv-bom-stock' ),
+				'desc_tip' => __( 'Applies only to deliberate back-office operations: manual Adjust entries and completing a manufacture order that\'s short a component. Customer orders are unaffected either way — a paid order always consumes its components (going negative if it must) and is flagged for you to reconcile, because refusing a paid order is worse than a stock discrepancy.', 'pv-bom-stock' ),
 				'id'       => NegativeStockPolicy::OPTION,
 				'type'     => 'checkbox',
 				'default'  => 'no',
 			),
 			array(
-				'title'    => __( 'Low stock digest email', 'wcbom' ),
-				'desc'     => __( 'Send a daily email listing components at or below their low-stock threshold.', 'wcbom' ),
-				'desc_tip' => __( 'Unlike WooCommerce\'s native per-product low-stock notice, this understands components: it also says how many made-to-order products a short component blocks. No email is sent on a day nothing is low.', 'wcbom' ),
+				'title'    => __( 'Low stock digest email', 'pv-bom-stock' ),
+				'desc'     => __( 'Send a daily email listing components at or below their low-stock threshold.', 'pv-bom-stock' ),
+				'desc_tip' => __( 'Unlike WooCommerce\'s native per-product low-stock notice, this understands components: it also says how many made-to-order products a short component blocks. No email is sent on a day nothing is low.', 'pv-bom-stock' ),
 				'id'       => LowStockDigest::OPTION_ENABLED,
 				'type'     => 'checkbox',
 				'default'  => 'no',
 			),
 			array(
-				'title'    => __( 'Digest recipient', 'wcbom' ),
-				'desc_tip' => __( 'Defaults to the site admin email when left blank.', 'wcbom' ),
+				'title'    => __( 'Digest recipient', 'pv-bom-stock' ),
+				'desc_tip' => __( 'Defaults to the site admin email when left blank.', 'pv-bom-stock' ),
 				'id'       => LowStockDigest::OPTION_EMAIL,
 				'type'     => 'email',
 				'default'  => '',
 			),
 			array(
-				'title'    => __( 'Enable vendors & purchase orders', 'wcbom' ),
-				'desc'     => __( 'Add a Purchasing section for tracking vendors and purchase orders against components.', 'wcbom' ),
-				'desc_tip' => __( 'Off by default. Leave unchecked to keep managing inventory manually exactly as before — with this off, no Purchasing menu item exists and no related fields appear anywhere else in the plugin. Turning it on doesn\'t seed any sample vendors or orders; the section starts empty.', 'wcbom' ),
+				'title'    => __( 'Enable vendors & purchase orders', 'pv-bom-stock' ),
+				'desc'     => __( 'Add a Purchasing section for tracking vendors and purchase orders against components.', 'pv-bom-stock' ),
+				'desc_tip' => __( 'Off by default. Leave unchecked to keep managing inventory manually exactly as before — with this off, no Purchasing menu item exists and no related fields appear anywhere else in the plugin. Turning it on doesn\'t seed any sample vendors or orders; the section starts empty.', 'pv-bom-stock' ),
 				'id'       => VendorsFeature::OPTION,
 				'type'     => 'checkbox',
 				'default'  => 'no',

@@ -1,6 +1,6 @@
 <?php
 /**
- * Shared factory helpers for wc-bom-stock's integration tests.
+ * Shared factory helpers for pv-bom-stock's integration tests.
  *
  * @package WCBOM
  */

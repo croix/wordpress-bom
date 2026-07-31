@@ -20,7 +20,7 @@ $table_prefix = 'wptests_';
 
 define( 'WP_TESTS_DOMAIN', 'example.org' );
 define( 'WP_TESTS_EMAIL', 'admin@example.org' );
-define( 'WP_TESTS_TITLE', 'wc-bom-stock test suite' );
+define( 'WP_TESTS_TITLE', 'pv-bom-stock test suite' );
 
 define( 'WP_PHP_BINARY', 'php' );
 define( 'WPLANG', '' );

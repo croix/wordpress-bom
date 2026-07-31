@@ -1,6 +1,6 @@
 <?php
 /**
- * WP-CLI commands for wc-bom-stock.
+ * WP-CLI commands for pv-bom-stock.
  *
  * @package WCBOM
  */

@@ -23,7 +23,7 @@ use WCBOM\Stock\Ledger;
 use WCBOM\Stock\OperationGuard;
 use WCBOM\Stock\StockService;
 
-$template_id = (int) ( wc_get_product_id_by_sku( 'WCBOM-CUSTOM-TUMBLER' ) ?: 0 );
+$template_id = (int) wc_get_product_id_by_sku( 'WCBOM-CUSTOM-TUMBLER' );
 if ( ! $template_id ) {
 	WP_CLI::error( 'Seeded made-to-order product not found — run "wp wcbom seed --reset" first.' );
 }

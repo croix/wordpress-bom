@@ -53,8 +53,8 @@ final class PurchasingPage {
 	public function add_menu_page(): void {
 		$this->hook_suffix = add_submenu_page(
 			PluginMenu::SLUG,
-			__( 'Purchasing', 'wcbom' ),
-			__( 'Purchasing', 'wcbom' ),
+			__( 'Purchasing', 'pv-bom-stock' ),
+			__( 'Purchasing', 'pv-bom-stock' ),
 			'manage_woocommerce',
 			'wcbom-purchasing',
 			array( $this, 'render_page' )
@@ -67,7 +67,7 @@ final class PurchasingPage {
 	 * Renders the mount point for the React app.
 	 */
 	public function render_page(): void {
-		echo '<div class="wrap"><div id="wcbom-purchasing-root"><p>' . esc_html__( 'Loading Purchasing…', 'wcbom' ) . '</p></div></div>';
+		echo '<div class="wrap"><div id="wcbom-purchasing-root"><p>' . esc_html__( 'Loading Purchasing…', 'pv-bom-stock' ) . '</p></div></div>';
 	}
 
 	/**

@@ -50,8 +50,8 @@ final class GuidePage {
 	public function add_menu_page(): void {
 		$this->hook_suffix = add_submenu_page(
 			PluginMenu::SLUG,
-			__( 'Guide', 'wcbom' ),
-			__( 'Guide', 'wcbom' ),
+			__( 'Guide', 'pv-bom-stock' ),
+			__( 'Guide', 'pv-bom-stock' ),
 			'manage_woocommerce',
 			'wcbom-guide',
 			array( $this, 'render_page' )
@@ -88,8 +88,8 @@ final class GuidePage {
 		$sections = GuideContent::sections();
 
 		echo '<div class="wrap wcbom-guide">';
-		echo '<h1>' . esc_html__( 'BOM & Stock Guide', 'wcbom' ) . '</h1>';
-		echo '<p>' . esc_html__( 'Everything this plugin adds, explained in one place — enough to train a new user from a fresh install.', 'wcbom' ) . '</p>';
+		echo '<h1>' . esc_html__( 'BOM & Stock Guide', 'pv-bom-stock' ) . '</h1>';
+		echo '<p>' . esc_html__( 'Everything this plugin adds, explained in one place — enough to train a new user from a fresh install.', 'pv-bom-stock' ) . '</p>';
 
 		echo '<nav class="wcbom-guide-toc"><ul>';
 		foreach ( $sections as $section ) {

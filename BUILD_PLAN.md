@@ -1,6 +1,6 @@
 # WooCommerce BOM & Stock Management Plugin — Build Plan
 
-**Working name:** `wc-bom-stock` (WooCommerce BOM & Stock Manager)
+**Plugin name:** `pv-bom-stock` (PoorVida BOM & Stock Manager) — renamed 2026-07-31 from the working name `wc-bom-stock` (WooCommerce BOM & Stock Manager) to comply with wordpress.org's trademark policy on "wc"/"WooCommerce" in a plugin slug/name, ahead of a possible future wordpress.org submission; see CLAUDE.md's dated Progress Log entry for the full rationale. References to the old name/slug below reflect the plugin's architecture as originally scoped and still apply structurally — only the distributed name/slug/main-file changed, not the internal namespace/table prefix/REST namespace/CLI command.
 **Author:** Poor Vida
 **Status:** Scoped 2026-07-29, build to run on home machine.
 
@@ -64,8 +64,8 @@ All plugin-driven stock movements are written to an append-only **stock ledger**
 ## 3. Plugin structure
 
 ```
-wc-bom-stock/
-├── wc-bom-stock.php              # Bootstrap: constants, autoload, activation hook
+pv-bom-stock/
+├── pv-bom-stock.php               # Bootstrap: constants, autoload, activation hook
 ├── composer.json                 # PSR-4 autoload (WCBOM\ → src/), dev deps
 ├── uninstall.php                 # Optional table cleanup (behind a setting)
 ├── src/
@@ -846,7 +846,7 @@ The plugin ships as a normal installable zip, with updates delivered from GitHub
 WordPress 5.8+ supports third-party update channels natively: a plugin declares `Update URI:` in its header, and core fires an `update_plugins_{$hostname}` filter during every update check. Our `Updates\GitHubUpdater` hooks `update_plugins_github.com`, asks the GitHub Releases API for the latest release (cached 6h in a transient; cleared when the user clicks Dashboard → Updates → "Check Again"), compares versions, and hands WordPress the release's zip asset URL. From there it's a completely normal WordPress update: the "update available" row, one-click update, auto-update toggle — all standard.
 
 Two guards worth knowing about:
-- **The updater only activates when the installed folder is `wc-bom-stock`** (the release zip's root). WordPress replaces the plugin folder using the zip's root name on update, so a folder mismatch would strand the old copy. This also makes the updater inert in the wp-env dev mount (`wordpress-bom`) — dev never sees phantom updates.
+- **The updater only activates when the installed folder is `pv-bom-stock`** (the release zip's root; the folder was `wc-bom-stock` before the 2026-07-31 rename — see CLAUDE.md). WordPress replaces the plugin folder using the zip's root name on update, so a folder mismatch would strand the old copy. This also makes the updater inert in the wp-env dev mount (`wordpress-bom`) — dev never sees phantom updates.
 - All failure modes (API down, rate-limited, repo unreachable, no releases yet) cache a "no update" result and stay silent. An update check can never break a site.
 
 ### 14.2 The private-repo caveat (decision needed before first external tester)
@@ -860,17 +860,17 @@ Until decided, everything still works — checks just no-op silently.
 
 ### 14.3 Release workflow (what the developer actually does)
 
-1. Bump `Version:` in `wc-bom-stock.php` **and** the `WCBOM_VERSION` constant (and `Schema::DB_VERSION` if the schema changed).
+1. Bump `Version:` in `pv-bom-stock.php` **and** the `WCBOM_VERSION` constant (and `Schema::DB_VERSION` if the schema changed).
 2. Commit and push as normal.
 3. `git tag v0.2.0 && git push origin v0.2.0`
 
 That's it. A GitHub Action (`.github/workflows/release.yml`) fires on the tag: builds JS, assembles the zip via `bin/build-release-zip.sh`, **fails the release if the tag doesn't match the plugin header version** (can't ship a mislabeled zip), and publishes a GitHub Release with the zip attached. Sites see the update within ~6h, or immediately via "Check Again". Plain pushes to main never trigger updates — releases are always a deliberate tag.
 
-Manual fallback (no Actions): `bin/build-release-zip.sh` locally, then `gh release create v0.2.0 dist/wc-bom-stock-0.2.0.zip`.
+Manual fallback (no Actions): `bin/build-release-zip.sh` locally, then `gh release create v0.2.0 dist/pv-bom-stock-0.2.0.zip`.
 
 ### 14.4 The release zip
 
-Built by `bin/build-release-zip.sh` into `dist/` (gitignored). Rooted at **`wc-bom-stock/`** — this becomes the installed folder name and must never change between releases (see 14.1). Contains runtime files only: bootstrap + `uninstall.php`, `src/`, `assets/build/` (compiled JS, no `assets/src`), and a freshly generated `--no-dev` Composer autoloader (`vendor/` — no packages, just the PSR-4 autoloader the bootstrap requires). Excludes all dev material: git/CI files, node_modules, planning docs, lint configs, tests.
+Built by `bin/build-release-zip.sh` into `dist/` (gitignored). Rooted at **`pv-bom-stock/`** — this becomes the installed folder name and must never change between releases (see 14.1). Contains runtime files only: bootstrap + `uninstall.php`, `src/`, `assets/build/` (compiled JS, no `assets/src`), and a freshly generated `--no-dev` Composer autoloader (`vendor/` — no packages, just the PSR-4 autoloader the bootstrap requires). Excludes all dev material: git/CI files, node_modules, planning docs, lint configs, tests.
 
 ### 14.5 Updates must never require an uninstall — and never lose data
 

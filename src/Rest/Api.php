@@ -118,30 +118,30 @@ final class Api {
 		$product_id = (int) $request->get_param( 'product_id' );
 
 		if ( ! wc_get_product( $product_id ) ) {
-			return new WP_Error( 'wcbom_unknown_product', __( 'Unknown product.', 'wcbom' ), array( 'status' => 404 ) );
+			return new WP_Error( 'wcbom_unknown_product', __( 'Unknown product.', 'pv-bom-stock' ), array( 'status' => 404 ) );
 		}
 
 		$items = $request->get_param( 'items' );
 		if ( ! is_array( $items ) ) {
-			return new WP_Error( 'wcbom_invalid_items', __( 'items must be an array.', 'wcbom' ), array( 'status' => 400 ) );
+			return new WP_Error( 'wcbom_invalid_items', __( 'items must be an array.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 		}
 
 		$clean = array();
 		foreach ( $items as $item ) {
 			$component_id = isset( $item['component_id'] ) ? (int) $item['component_id'] : 0;
 			if ( $component_id <= 0 || ! wc_get_product( $component_id ) ) {
-				return new WP_Error( 'wcbom_invalid_component', __( 'Every line needs a valid component.', 'wcbom' ), array( 'status' => 400 ) );
+				return new WP_Error( 'wcbom_invalid_component', __( 'Every line needs a valid component.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 			}
 
 			$condition_type = isset( $item['condition_type'] ) ? (string) $item['condition_type'] : BomItem::CONDITION_ALWAYS;
 			if ( ! in_array( $condition_type, array( BomItem::CONDITION_ALWAYS, BomItem::CONDITION_ATTRIBUTE, BomItem::CONDITION_ADDON ), true ) ) {
-				return new WP_Error( 'wcbom_invalid_condition', __( 'Invalid condition_type.', 'wcbom' ), array( 'status' => 400 ) );
+				return new WP_Error( 'wcbom_invalid_condition', __( 'Invalid condition_type.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 			}
 
 			$surcharge = null;
 			if ( isset( $item['surcharge'] ) && '' !== $item['surcharge'] ) {
 				if ( ! is_numeric( $item['surcharge'] ) || (float) $item['surcharge'] < 0 ) {
-					return new WP_Error( 'wcbom_invalid_surcharge', __( 'Surcharge must be a non-negative number.', 'wcbom' ), array( 'status' => 400 ) );
+					return new WP_Error( 'wcbom_invalid_surcharge', __( 'Surcharge must be a non-negative number.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 				}
 				$surcharge = (float) $item['surcharge'];
 			}
@@ -185,7 +185,7 @@ final class Api {
 					'buildable_qty'  => 0,
 					'bottleneck'     => null,
 					'estimated_cost' => 0.0,
-					'note'           => __( 'No BOM lines yet.', 'wcbom' ),
+					'note'           => __( 'No BOM lines yet.', 'pv-bom-stock' ),
 				)
 			);
 		}
@@ -226,7 +226,7 @@ final class Api {
 				'bottleneck'     => $bottleneck,
 				'estimated_cost' => round( $cost, 2 ),
 				'note'           => array() === $always
-					? __( 'Only conditional lines are set — buildable count needs at least one always-consumed line.', 'wcbom' )
+					? __( 'Only conditional lines are set — buildable count needs at least one always-consumed line.', 'pv-bom-stock' )
 					: null,
 			)
 		);
@@ -273,7 +273,7 @@ final class Api {
 	public function create_component( WP_REST_Request $request ) {
 		$name = trim( (string) $request->get_param( 'name' ) );
 		if ( '' === $name ) {
-			return new WP_Error( 'wcbom_invalid_name', __( 'Component name is required.', 'wcbom' ), array( 'status' => 400 ) );
+			return new WP_Error( 'wcbom_invalid_name', __( 'Component name is required.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 		}
 
 		$unit_param = $request->get_param( 'unit' );

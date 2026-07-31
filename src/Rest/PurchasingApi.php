@@ -212,7 +212,7 @@ final class PurchasingApi {
 	public function create_vendor( WP_REST_Request $request ) {
 		$name = trim( (string) $request->get_param( 'name' ) );
 		if ( '' === $name ) {
-			return new WP_Error( 'wcbom_invalid_vendor', __( 'A vendor name is required.', 'wcbom' ), array( 'status' => 400 ) );
+			return new WP_Error( 'wcbom_invalid_vendor', __( 'A vendor name is required.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 		}
 
 		$vendor_id = $this->vendors->create(
@@ -235,12 +235,12 @@ final class PurchasingApi {
 	public function update_vendor( WP_REST_Request $request ) {
 		$vendor_id = (int) $request->get_param( 'id' );
 		if ( null === $this->vendors->get( $vendor_id ) ) {
-			return new WP_Error( 'wcbom_vendor_not_found', __( 'Unknown vendor.', 'wcbom' ), array( 'status' => 404 ) );
+			return new WP_Error( 'wcbom_vendor_not_found', __( 'Unknown vendor.', 'pv-bom-stock' ), array( 'status' => 404 ) );
 		}
 
 		$name = trim( (string) $request->get_param( 'name' ) );
 		if ( '' === $name ) {
-			return new WP_Error( 'wcbom_invalid_vendor', __( 'A vendor name is required.', 'wcbom' ), array( 'status' => 400 ) );
+			return new WP_Error( 'wcbom_invalid_vendor', __( 'A vendor name is required.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 		}
 
 		$this->vendors->update(
@@ -289,7 +289,7 @@ final class PurchasingApi {
 	public function get_order( WP_REST_Request $request ) {
 		$po = $this->orders->get( (int) $request->get_param( 'id' ) );
 		if ( null === $po ) {
-			return new WP_Error( 'wcbom_po_not_found', __( 'Unknown purchase order.', 'wcbom' ), array( 'status' => 404 ) );
+			return new WP_Error( 'wcbom_po_not_found', __( 'Unknown purchase order.', 'pv-bom-stock' ), array( 'status' => 404 ) );
 		}
 
 		return new WP_REST_Response( array( 'order' => $this->present_order( $po ) ) );
@@ -397,12 +397,12 @@ final class PurchasingApi {
 	public function receive( WP_REST_Request $request ) {
 		$op_key = (string) $request->get_param( 'op_key' );
 		if ( '' === $op_key ) {
-			return new WP_Error( 'wcbom_missing_op_key', __( 'Missing op_key.', 'wcbom' ), array( 'status' => 400 ) );
+			return new WP_Error( 'wcbom_missing_op_key', __( 'Missing op_key.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 		}
 
 		$receipts = $request->get_param( 'receipts' );
 		if ( ! is_array( $receipts ) || array() === $receipts ) {
-			return new WP_Error( 'wcbom_invalid_receipts', __( 'receipts must be a non-empty map of poi_id to quantity.', 'wcbom' ), array( 'status' => 400 ) );
+			return new WP_Error( 'wcbom_invalid_receipts', __( 'receipts must be a non-empty map of poi_id to quantity.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 		}
 
 		$parsed = array();
@@ -446,7 +446,7 @@ final class PurchasingApi {
 	public function send_email( WP_REST_Request $request ) {
 		$po = $this->orders->get( (int) $request->get_param( 'id' ) );
 		if ( null === $po ) {
-			return new WP_Error( 'wcbom_po_not_found', __( 'Unknown purchase order.', 'wcbom' ), array( 'status' => 404 ) );
+			return new WP_Error( 'wcbom_po_not_found', __( 'Unknown purchase order.', 'pv-bom-stock' ), array( 'status' => 404 ) );
 		}
 
 		try {
@@ -471,7 +471,7 @@ final class PurchasingApi {
 	public function delete_draft( WP_REST_Request $request ) {
 		$deleted = $this->purchasing->delete_draft( (int) $request->get_param( 'id' ) );
 		if ( ! $deleted ) {
-			return new WP_Error( 'wcbom_po_delete_failed', __( 'Only draft purchase orders can be deleted.', 'wcbom' ), array( 'status' => 400 ) );
+			return new WP_Error( 'wcbom_po_delete_failed', __( 'Only draft purchase orders can be deleted.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 		}
 
 		return new WP_REST_Response( array( 'deleted' => true ) );
@@ -486,19 +486,19 @@ final class PurchasingApi {
 	private function parse_items( WP_REST_Request $request ) {
 		$items = $request->get_param( 'items' );
 		if ( ! is_array( $items ) || array() === $items ) {
-			return new WP_Error( 'wcbom_invalid_items', __( 'items must be a non-empty array.', 'wcbom' ), array( 'status' => 400 ) );
+			return new WP_Error( 'wcbom_invalid_items', __( 'items must be a non-empty array.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 		}
 
 		$clean = array();
 		foreach ( $items as $item ) {
 			if ( ! is_array( $item ) || ! isset( $item['component_id'], $item['qty_ordered'] ) ) {
-				return new WP_Error( 'wcbom_invalid_items', __( 'Each item needs a component_id and qty_ordered.', 'wcbom' ), array( 'status' => 400 ) );
+				return new WP_Error( 'wcbom_invalid_items', __( 'Each item needs a component_id and qty_ordered.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 			}
 
 			$component_id = (int) $item['component_id'];
 			$qty_ordered  = (float) $item['qty_ordered'];
 			if ( $component_id <= 0 || ! wc_get_product( $component_id ) || $qty_ordered <= 0 ) {
-				return new WP_Error( 'wcbom_invalid_items', __( 'Each item needs a valid component and a positive quantity.', 'wcbom' ), array( 'status' => 400 ) );
+				return new WP_Error( 'wcbom_invalid_items', __( 'Each item needs a valid component and a positive quantity.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 			}
 
 			$clean[] = array(

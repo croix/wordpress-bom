@@ -85,7 +85,7 @@ final class OrderSync {
 				$order->add_order_note(
 					sprintf(
 						/* translators: 1: order item name, 2: error message */
-						__( '⚠ BOM: component consumption FAILED for "%1$s" (%2$s). No component stock was changed for this item — adjust inventory manually or run the audit.', 'wcbom' ),
+						__( '⚠ BOM: component consumption FAILED for "%1$s" (%2$s). No component stock was changed for this item — adjust inventory manually or run the audit.', 'pv-bom-stock' ),
 						$item->get_name(),
 						$e->getMessage()
 					)
@@ -133,7 +133,7 @@ final class OrderSync {
 				$order->add_order_note(
 					sprintf(
 						/* translators: 1: component product ID, 2: order item name */
-						__( 'BOM warning: component #%1$d referenced by "%2$s" no longer exists — skipped.', 'wcbom' ),
+						__( 'BOM warning: component #%1$d referenced by "%2$s" no longer exists — skipped.', 'pv-bom-stock' ),
 						$line->component_id,
 						$item->get_name()
 					)
@@ -165,7 +165,7 @@ final class OrderSync {
 			$order->add_order_note(
 				sprintf(
 					/* translators: 1: order item name, 2: shortage details */
-					__( '⚠ BOM component shortage while consuming for "%1$s": %2$s. Component stock has gone negative — check physical inventory.', 'wcbom' ),
+					__( '⚠ BOM component shortage while consuming for "%1$s": %2$s. Component stock has gone negative — check physical inventory.', 'pv-bom-stock' ),
 					$item->get_name(),
 					$e->getMessage()
 				)
@@ -233,7 +233,7 @@ final class OrderSync {
 			$order->add_order_note(
 				sprintf(
 					/* translators: %s: order item name */
-					__( 'BOM: restored components for "%s" from consumption snapshot.', 'wcbom' ),
+					__( 'BOM: restored components for "%s" from consumption snapshot.', 'pv-bom-stock' ),
 					$item->get_name()
 				)
 			);
@@ -297,7 +297,7 @@ final class OrderSync {
 
 		return sprintf(
 			/* translators: 1: order item name, 2: comma-separated component list */
-			__( 'BOM: consumed for "%1$s": %2$s.', 'wcbom' ),
+			__( 'BOM: consumed for "%1$s": %2$s.', 'pv-bom-stock' ),
 			$item_name,
 			implode( ', ', $parts )
 		);

@@ -171,7 +171,7 @@ final class InventoryApi {
 			static function ( array $item ) {
 				return isset( $item['qty'] ) && (float) $item['qty'] > 0;
 			},
-			__( 'Each item needs a valid product and a positive quantity.', 'wcbom' )
+			__( 'Each item needs a valid product and a positive quantity.', 'pv-bom-stock' )
 		);
 
 		if ( $items instanceof WP_Error ) {
@@ -205,7 +205,7 @@ final class InventoryApi {
 			static function ( array $item ) {
 				return isset( $item['qty'] ) && (float) $item['qty'] >= 0;
 			},
-			__( 'Each item needs a valid product and a non-negative counted quantity.', 'wcbom' )
+			__( 'Each item needs a valid product and a non-negative counted quantity.', 'pv-bom-stock' )
 		);
 
 		if ( $items instanceof WP_Error ) {
@@ -257,7 +257,7 @@ final class InventoryApi {
 	 */
 	public function apply_adjust( WP_REST_Request $request ) {
 		if ( '' === trim( (string) $request->get_param( 'note' ) ) ) {
-			return new WP_Error( 'wcbom_note_required', __( 'A note is required for manual adjustments.', 'wcbom' ), array( 'status' => 400 ) );
+			return new WP_Error( 'wcbom_note_required', __( 'A note is required for manual adjustments.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 		}
 
 		$items = $this->validate_items(
@@ -265,7 +265,7 @@ final class InventoryApi {
 			static function ( array $item ) {
 				return isset( $item['qty'] ) && 0.0 !== (float) $item['qty'];
 			},
-			__( 'Each item needs a valid product and a non-zero adjustment.', 'wcbom' )
+			__( 'Each item needs a valid product and a non-zero adjustment.', 'pv-bom-stock' )
 		);
 
 		if ( $items instanceof WP_Error ) {
@@ -294,14 +294,14 @@ final class InventoryApi {
 	private function apply( WP_REST_Request $request, array $deltas, string $reason, bool $allow_negative ) {
 		$op_key = (string) $request->get_param( 'op_key' );
 		if ( '' === $op_key ) {
-			return new WP_Error( 'wcbom_missing_op_key', __( 'Missing op_key.', 'wcbom' ), array( 'status' => 400 ) );
+			return new WP_Error( 'wcbom_missing_op_key', __( 'Missing op_key.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 		}
 
 		if ( ! $this->guard->claim( $op_key, "{$reason} via Inventory screen" ) ) {
 			return new WP_REST_Response(
 				array(
 					'already_applied' => true,
-					'message'         => __( 'This operation was already applied — no changes were made.', 'wcbom' ),
+					'message'         => __( 'This operation was already applied — no changes were made.', 'pv-bom-stock' ),
 				)
 			);
 		}
@@ -345,7 +345,7 @@ final class InventoryApi {
 	private function validate_items( WP_REST_Request $request, callable $item_valid, string $error_message ) {
 		$items = $request->get_param( 'items' );
 		if ( ! is_array( $items ) || array() === $items ) {
-			return new WP_Error( 'wcbom_invalid_items', __( 'items must be a non-empty array.', 'wcbom' ), array( 'status' => 400 ) );
+			return new WP_Error( 'wcbom_invalid_items', __( 'items must be a non-empty array.', 'pv-bom-stock' ), array( 'status' => 400 ) );
 		}
 
 		$clean = array();

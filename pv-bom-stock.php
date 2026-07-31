@@ -1,16 +1,18 @@
 <?php
 /**
- * Plugin Name:       WooCommerce BOM & Stock Manager
+ * Plugin Name:       PoorVida BOM & Stock Manager
  * Plugin URI:        https://github.com/croix/wordpress-bom
  * Description:       Bill-of-materials and component-level stock management for WooCommerce — made-to-order component consumption, manufacture orders, and a full stock ledger.
- * Version:           1.0.1
+ * Version:           2.0.0
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Requires Plugins:  woocommerce
  * WC requires at least: 8.5
  * Author:            Poor Vida
- * Text Domain:       wcbom
+ * Text Domain:       pv-bom-stock
  * Domain Path:       /languages
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Update URI:        https://github.com/croix/wordpress-bom
  *
  * @package WCBOM
@@ -18,7 +20,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'WCBOM_VERSION', '1.0.1' );
+define( 'WCBOM_VERSION', '2.0.0' );
 define( 'WCBOM_PLUGIN_FILE', __FILE__ );
 define( 'WCBOM_PLUGIN_DIR', __DIR__ );
 // Keep in sync with the "WC requires at least" header above.
@@ -37,7 +39,7 @@ if ( ! file_exists( $wcbom_autoload ) ) {
 	add_action(
 		'admin_notices',
 		static function () {
-			echo '<div class="notice notice-error"><p>' . esc_html__( 'WooCommerce BOM & Stock Manager could not find its own dependencies (vendor/autoload.php is missing) and cannot run. This usually means it was installed from GitHub\'s "Download ZIP" button instead of the built release — download the wc-bom-stock-X.Y.Z.zip file from the Releases page instead.', 'wcbom' ) . '</p></div>';
+			echo '<div class="notice notice-error"><p>' . esc_html__( 'PoorVida BOM & Stock Manager could not find its own dependencies (vendor/autoload.php is missing) and cannot run. This usually means it was installed from GitHub\'s "Download ZIP" button instead of the built release — download the pv-bom-stock-X.Y.Z.zip file from the Releases page instead.', 'pv-bom-stock' ) . '</p></div>';
 		}
 	);
 	return;
@@ -66,7 +68,7 @@ add_action(
 			add_action(
 				'admin_notices',
 				function () {
-					echo '<div class="notice notice-error"><p>' . esc_html__( 'WooCommerce BOM & Stock Manager requires WooCommerce to be installed and active.', 'wcbom' ) . '</p></div>';
+					echo '<div class="notice notice-error"><p>' . esc_html__( 'PoorVida BOM & Stock Manager requires WooCommerce to be installed and active.', 'pv-bom-stock' ) . '</p></div>';
 				}
 			);
 			return;
@@ -87,7 +89,7 @@ add_action(
 						esc_html(
 							sprintf(
 								/* translators: 1: minimum required WooCommerce version, 2: installed WooCommerce version */
-								__( 'WooCommerce BOM & Stock Manager requires WooCommerce %1$s or newer (found %2$s) and has been deactivated.', 'wcbom' ),
+								__( 'PoorVida BOM & Stock Manager requires WooCommerce %1$s or newer (found %2$s) and has been deactivated.', 'pv-bom-stock' ),
 								WCBOM_MIN_WC_VERSION,
 								WC_VERSION
 							)

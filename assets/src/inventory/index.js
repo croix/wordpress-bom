@@ -58,8 +58,8 @@ function InventoryApp( { restNamespace } ) {
 					status: 'success',
 					message:
 						'install' === action
-							? __( 'Sample products installed. They are visible on your storefront until removed.', 'wcbom' )
-							: __( 'Sample products removed.', 'wcbom' ),
+							? __( 'Sample products installed. They are visible on your storefront until removed.', 'pv-bom-stock' )
+							: __( 'Sample products removed.', 'pv-bom-stock' ),
 				} );
 				load();
 			} )
@@ -106,11 +106,11 @@ function InventoryApp( { restNamespace } ) {
 			const suffix = changed.length
 				? ' ' + sprintf(
 						/* translators: %d: number of made-to-order products whose buildable count changed */
-						__( '(%d made-to-order product(s) had their buildable count updated.)', 'wcbom' ),
+						__( '(%d made-to-order product(s) had their buildable count updated.)', 'pv-bom-stock' ),
 						changed.length
 				  )
 				: '';
-			setNotice( { status: 'success', message: __( 'Applied.', 'wcbom' ) + suffix } );
+			setNotice( { status: 'success', message: __( 'Applied.', 'pv-bom-stock' ) + suffix } );
 		}
 
 		load();
@@ -119,7 +119,7 @@ function InventoryApp( { restNamespace } ) {
 	return (
 		<Card>
 			<CardBody>
-				<h1>{ __( 'Component Inventory', 'wcbom' ) }</h1>
+				<h1>{ __( 'Component Inventory', 'pv-bom-stock' ) }</h1>
 
 				{ notice && (
 					<Notice status={ notice.status } onRemove={ () => setNotice( null ) }>
@@ -128,7 +128,7 @@ function InventoryApp( { restNamespace } ) {
 				) }
 
 				<TextControl
-					label={ __( 'Search', 'wcbom' ) }
+					label={ __( 'Search', 'pv-bom-stock' ) }
 					value={ search }
 					onChange={ setSearch }
 					__next40pxDefaultSize
@@ -143,7 +143,7 @@ function InventoryApp( { restNamespace } ) {
 					>
 						{ sprintf(
 							/* translators: %d: number of components selected to receive */
-							__( 'Receive selected (%d)', 'wcbom' ),
+							__( 'Receive selected (%d)', 'pv-bom-stock' ),
 							selectedComponents.length
 						) }
 					</Button>
@@ -151,9 +151,9 @@ function InventoryApp( { restNamespace } ) {
 
 				{ ! loading && components.length === 0 && ! search && (
 					<Notice status="info" isDismissible={ false }>
-						{ __( 'No components yet. You can install a sample tumbler catalog (components, a premade product, and a customizable made-to-order product with a working BOM) to explore how everything fits together. Sample products are visible on your storefront and can be removed with one click.', 'wcbom' ) }{ ' ' }
+						{ __( 'No components yet. You can install a sample tumbler catalog (components, a premade product, and a customizable made-to-order product with a working BOM) to explore how everything fits together. Sample products are visible on your storefront and can be removed with one click.', 'pv-bom-stock' ) }{ ' ' }
 						<Button variant="primary" isBusy={ sampleBusy } disabled={ sampleBusy } onClick={ () => runSampleAction( 'install' ) }>
-							{ __( 'Install sample products', 'wcbom' ) }
+							{ __( 'Install sample products', 'pv-bom-stock' ) }
 						</Button>
 					</Notice>
 				) }
@@ -165,12 +165,12 @@ function InventoryApp( { restNamespace } ) {
 						<thead>
 							<tr>
 								<th></th>
-								<th>{ __( 'Component', 'wcbom' ) }</th>
-								<th>{ __( 'SKU', 'wcbom' ) }</th>
-								<th>{ __( 'On hand', 'wcbom' ) }</th>
-								{ hasOnOrder && <th>{ __( 'On order', 'wcbom' ) }</th> }
-								<th>{ __( 'Used in', 'wcbom' ) }</th>
-								<th>{ __( 'Last movement', 'wcbom' ) }</th>
+								<th>{ __( 'Component', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'SKU', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'On hand', 'pv-bom-stock' ) }</th>
+								{ hasOnOrder && <th>{ __( 'On order', 'pv-bom-stock' ) }</th> }
+								<th>{ __( 'Used in', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Last movement', 'pv-bom-stock' ) }</th>
 								<th></th>
 							</tr>
 						</thead>
@@ -198,20 +198,20 @@ function InventoryApp( { restNamespace } ) {
 									) }
 									<td>{ sprintf(
 										/* translators: %d: number of active BOMs this component is used in */
-										__( '%d BOM(s)', 'wcbom' ),
+										__( '%d BOM(s)', 'pv-bom-stock' ),
 										c.used_in_count
 									) }</td>
 									<td>
 										{ c.last_movement
 											? `${ c.last_movement.reason } (${ c.last_movement.delta > 0 ? '+' : '' }${ formatNumber( c.last_movement.delta ) })`
-											: __( '—', 'wcbom' ) }
+											: __( '—', 'pv-bom-stock' ) }
 									</td>
 									<td>
 										<Button variant="secondary" onClick={ () => openCount( c ) }>
-											{ __( 'Count', 'wcbom' ) }
+											{ __( 'Count', 'pv-bom-stock' ) }
 										</Button>{ ' ' }
 										<Button variant="secondary" onClick={ () => openAdjust( c ) }>
-											{ __( 'Adjust', 'wcbom' ) }
+											{ __( 'Adjust', 'pv-bom-stock' ) }
 										</Button>
 									</td>
 								</tr>
@@ -223,7 +223,7 @@ function InventoryApp( { restNamespace } ) {
 				{ samplesInstalled && (
 					<p>
 						<Button variant="tertiary" isDestructive isBusy={ sampleBusy } disabled={ sampleBusy } onClick={ () => runSampleAction( 'remove' ) }>
-							{ __( 'Remove sample products', 'wcbom' ) }
+							{ __( 'Remove sample products', 'pv-bom-stock' ) }
 						</Button>
 					</p>
 				) }
@@ -245,22 +245,22 @@ function InventoryApp( { restNamespace } ) {
 
 const MODAL_CONFIG = {
 	receive: {
-		title: __( 'Receive stock', 'wcbom' ),
+		title: __( 'Receive stock', 'pv-bom-stock' ),
 		endpoint: 'receive',
-		qtyLabel: __( 'Quantity received', 'wcbom' ),
-		submitLabel: __( 'Receive', 'wcbom' ),
+		qtyLabel: __( 'Quantity received', 'pv-bom-stock' ),
+		submitLabel: __( 'Receive', 'pv-bom-stock' ),
 	},
 	count: {
-		title: __( 'Cycle count', 'wcbom' ),
+		title: __( 'Cycle count', 'pv-bom-stock' ),
 		endpoint: 'count',
-		qtyLabel: __( 'Counted quantity', 'wcbom' ),
-		submitLabel: __( 'Save count', 'wcbom' ),
+		qtyLabel: __( 'Counted quantity', 'pv-bom-stock' ),
+		submitLabel: __( 'Save count', 'pv-bom-stock' ),
 	},
 	adjust: {
-		title: __( 'Manual adjustment', 'wcbom' ),
+		title: __( 'Manual adjustment', 'pv-bom-stock' ),
 		endpoint: 'adjust',
-		qtyLabel: __( 'Adjustment (+/-)', 'wcbom' ),
-		submitLabel: __( 'Adjust', 'wcbom' ),
+		qtyLabel: __( 'Adjustment (+/-)', 'pv-bom-stock' ),
+		submitLabel: __( 'Adjust', 'pv-bom-stock' ),
 	},
 };
 
@@ -275,7 +275,7 @@ function StockModal( { restNamespace, type, components, opKey, onClose, onApplie
 
 	function submit() {
 		if ( 'adjust' === type && '' === note.trim() ) {
-			setError( __( 'A note is required for manual adjustments.', 'wcbom' ) );
+			setError( __( 'A note is required for manual adjustments.', 'pv-bom-stock' ) );
 			return;
 		}
 
@@ -284,7 +284,7 @@ function StockModal( { restNamespace, type, components, opKey, onClose, onApplie
 			.filter( ( item ) => ! Number.isNaN( item.qty ) );
 
 		if ( items.length === 0 ) {
-			setError( __( 'Enter at least one quantity.', 'wcbom' ) );
+			setError( __( 'Enter at least one quantity.', 'pv-bom-stock' ) );
 			return;
 		}
 
@@ -324,7 +324,7 @@ function StockModal( { restNamespace, type, components, opKey, onClose, onApplie
 						<p className="description">
 							{ sprintf(
 								/* translators: %s: signed drift amount */
-								__( 'Drift: %s', 'wcbom' ),
+								__( 'Drift: %s', 'pv-bom-stock' ),
 								( parseFloat( quantities[ c.id ] ) - c.stock >= 0 ? '+' : '' ) +
 									formatNumber( parseFloat( quantities[ c.id ] ) - c.stock )
 							) }
@@ -335,7 +335,7 @@ function StockModal( { restNamespace, type, components, opKey, onClose, onApplie
 
 			<Field>
 				<TextControl
-					label={ __( 'Note', 'wcbom' ) + ( 'adjust' === type ? ' ' + __( '(required)', 'wcbom' ) : ' ' + __( '(optional)', 'wcbom' ) ) }
+					label={ __( 'Note', 'pv-bom-stock' ) + ( 'adjust' === type ? ' ' + __( '(required)', 'pv-bom-stock' ) : ' ' + __( '(optional)', 'pv-bom-stock' ) ) }
 					value={ note }
 					onChange={ setNote }
 					__next40pxDefaultSize
@@ -348,7 +348,7 @@ function StockModal( { restNamespace, type, components, opKey, onClose, onApplie
 					{ config.submitLabel }
 				</Button>{ ' ' }
 				<Button variant="tertiary" disabled={ submitting } onClick={ onClose }>
-					{ __( 'Cancel', 'wcbom' ) }
+					{ __( 'Cancel', 'pv-bom-stock' ) }
 				</Button>
 			</p>
 		</Modal>

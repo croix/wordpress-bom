@@ -39,8 +39,8 @@ final class PluginMenu {
 	 */
 	public function add_menu(): void {
 		add_menu_page(
-			__( 'BOM & Stock', 'wcbom' ),
-			__( 'BOM & Stock', 'wcbom' ),
+			__( 'BOM & Stock', 'pv-bom-stock' ),
+			__( 'BOM & Stock', 'pv-bom-stock' ),
 			'manage_woocommerce',
 			self::SLUG,
 			'__return_null',

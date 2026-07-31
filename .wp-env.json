@@ -12,6 +12,6 @@
         "WP_DEBUG_DISPLAY": false
     },
     "lifecycleScripts": {
-        "afterStart": "wp plugin activate woocommerce woo-extra-product-options variation-swatches-woo wordpress-bom/wc-bom-stock.php && wp wcbom seed"
+        "afterStart": "wp plugin activate woocommerce woo-extra-product-options variation-swatches-woo wordpress-bom/pv-bom-stock.php && wp wcbom seed"
     }
 }

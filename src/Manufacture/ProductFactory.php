@@ -57,17 +57,17 @@ final class ProductFactory {
 	 */
 	public function create_from_template( int $template_product_id, string $title, string $price, array $attributes ): array {
 		if ( ! wc_get_product( $template_product_id ) ) {
-			throw new \RuntimeException( esc_html__( 'Unknown template product.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'Unknown template product.', 'pv-bom-stock' ) );
 		}
 
 		$bom = $this->boms->get_active_for_product( $template_product_id );
 		if ( null === $bom ) {
-			throw new \RuntimeException( esc_html__( 'The template product has no active BOM.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'The template product has no active BOM.', 'pv-bom-stock' ) );
 		}
 
 		$lines = $this->matcher->resolve_for_selection( $bom, $attributes );
 		if ( array() === $lines ) {
-			throw new \RuntimeException( esc_html__( 'No BOM lines match the chosen options.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'No BOM lines match the chosen options.', 'pv-bom-stock' ) );
 		}
 
 		$product_id = $this->create_product( $title, $price );

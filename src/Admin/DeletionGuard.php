@@ -57,8 +57,8 @@ final class DeletionGuard {
 		}
 
 		wp_die(
-			esc_html__( "This product is used as a component in an active Bill of Materials and can't be deleted. Remove it from that BOM first.", 'wcbom' ),
-			esc_html__( 'Component in use', 'wcbom' ),
+			esc_html__( "This product is used as a component in an active Bill of Materials and can't be deleted. Remove it from that BOM first.", 'pv-bom-stock' ),
+			esc_html__( 'Component in use', 'pv-bom-stock' ),
 			array( 'back_link' => true )
 		);
 	}

@@ -46,8 +46,8 @@ final class ManufacturePage {
 	public function add_menu_page(): void {
 		$this->hook_suffix = add_submenu_page(
 			PluginMenu::SLUG,
-			__( 'Manufacturing', 'wcbom' ),
-			__( 'Manufacturing', 'wcbom' ),
+			__( 'Manufacturing', 'pv-bom-stock' ),
+			__( 'Manufacturing', 'pv-bom-stock' ),
 			'manage_woocommerce',
 			'wcbom-manufacturing',
 			array( $this, 'render_page' )
@@ -60,7 +60,7 @@ final class ManufacturePage {
 	 * Renders the mount point for the React app.
 	 */
 	public function render_page(): void {
-		echo '<div class="wrap"><div id="wcbom-manufacturing-root"><p>' . esc_html__( 'Loading Manufacturing…', 'wcbom' ) . '</p></div></div>';
+		echo '<div class="wrap"><div id="wcbom-manufacturing-root"><p>' . esc_html__( 'Loading Manufacturing…', 'pv-bom-stock' ) . '</p></div></div>';
 	}
 
 	/**

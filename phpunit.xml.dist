@@ -5,7 +5,7 @@
 	colors="true"
 >
 	<testsuites>
-		<testsuite name="wc-bom-stock">
+		<testsuite name="pv-bom-stock">
 			<directory suffix="Test.php">./tests/</directory>
 		</testsuite>
 	</testsuites>

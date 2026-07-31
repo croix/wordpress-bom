@@ -100,7 +100,7 @@ final class RefundHandler {
 			$order->add_order_note(
 				sprintf(
 					/* translators: 1: refunded quantity, 2: order item name */
-					__( 'BOM: restored components for %1$s refunded unit(s) of "%2$s".', 'wcbom' ),
+					__( 'BOM: restored components for %1$s refunded unit(s) of "%2$s".', 'pv-bom-stock' ),
 					rtrim( rtrim( number_format( $restorable_units, 2 ), '0' ), '.' ),
 					$item->get_name()
 				)

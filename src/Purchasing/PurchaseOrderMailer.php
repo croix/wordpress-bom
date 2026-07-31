@@ -47,7 +47,7 @@ final class PurchaseOrderMailer {
 	 */
 	public function send( PurchaseOrder $po, bool $to_vendor, bool $to_myself ): array {
 		if ( ! $to_vendor && ! $to_myself ) {
-			throw new \RuntimeException( esc_html__( 'Select at least one recipient.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'Select at least one recipient.', 'pv-bom-stock' ) );
 		}
 
 		$recipients = array();
@@ -60,7 +60,7 @@ final class PurchaseOrderMailer {
 			if ( '' !== $email && is_email( $email ) ) {
 				$recipients[] = $email;
 			} else {
-				$warnings[] = esc_html__( 'The vendor has no email address on file — nothing was sent to them.', 'wcbom' );
+				$warnings[] = esc_html__( 'The vendor has no email address on file — nothing was sent to them.', 'pv-bom-stock' );
 			}
 		}
 
@@ -71,12 +71,12 @@ final class PurchaseOrderMailer {
 			if ( '' !== $email && is_email( $email ) ) {
 				$recipients[] = $email;
 			} else {
-				$warnings[] = esc_html__( 'Your account has no email address on file.', 'wcbom' );
+				$warnings[] = esc_html__( 'Your account has no email address on file.', 'pv-bom-stock' );
 			}
 		}
 
 		if ( array() === $recipients ) {
-			throw new \RuntimeException( esc_html__( 'No valid recipient — check that the vendor and/or your account has an email address on file.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'No valid recipient — check that the vendor and/or your account has an email address on file.', 'pv-bom-stock' ) );
 		}
 
 		$subject = $this->compose_subject( $po );
@@ -100,7 +100,7 @@ final class PurchaseOrderMailer {
 	public function compose_subject( PurchaseOrder $po ): string {
 		return sprintf(
 			/* translators: 1: purchase order ID, 2: site name */
-			__( 'Purchase Order #%1$d — %2$s', 'wcbom' ),
+			__( 'Purchase Order #%1$d — %2$s', 'pv-bom-stock' ),
 			$po->po_id,
 			wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES )
 		);
@@ -117,35 +117,35 @@ final class PurchaseOrderMailer {
 		$lines   = array();
 		$lines[] = sprintf(
 			/* translators: %d: purchase order ID */
-			__( 'Purchase Order #%d', 'wcbom' ),
+			__( 'Purchase Order #%d', 'pv-bom-stock' ),
 			$po->po_id
 		);
 		$lines[] = sprintf(
 			/* translators: %s: vendor name */
-			__( 'Vendor: %s', 'wcbom' ),
-			$vendor ? $vendor->name : __( '(unknown vendor)', 'wcbom' )
+			__( 'Vendor: %s', 'pv-bom-stock' ),
+			$vendor ? $vendor->name : __( '(unknown vendor)', 'pv-bom-stock' )
 		);
 		if ( null !== $po->reference ) {
 			$lines[] = sprintf(
 				/* translators: %s: vendor reference/invoice number */
-				__( 'Reference: %s', 'wcbom' ),
+				__( 'Reference: %s', 'pv-bom-stock' ),
 				$po->reference
 			);
 		}
 		if ( null !== $po->expected_date ) {
 			$lines[] = sprintf(
 				/* translators: %s: expected delivery date */
-				__( 'Expected date: %s', 'wcbom' ),
+				__( 'Expected date: %s', 'pv-bom-stock' ),
 				$po->expected_date
 			);
 		}
 		$lines[] = '';
-		$lines[] = __( 'Line items:', 'wcbom' );
+		$lines[] = __( 'Line items:', 'pv-bom-stock' );
 
 		$subtotal = 0.0;
 		foreach ( $po->items as $item ) {
 			$component = wc_get_product( $item->component_id );
-			$name      = $component ? $component->get_name() : __( '(unknown component)', 'wcbom' );
+			$name      = $component ? $component->get_name() : __( '(unknown component)', 'pv-bom-stock' );
 			$unit      = $component ? get_post_meta( $component->get_id(), '_wcbom_unit', true ) : '';
 			$unit      = '' !== $unit ? $unit : 'ea';
 			$qty       = rtrim( rtrim( number_format( $item->qty_ordered, 4 ), '0' ), '.' );
@@ -175,28 +175,28 @@ final class PurchaseOrderMailer {
 		$lines[] = '';
 		$lines[] = sprintf(
 			/* translators: %s: freight/shipping cost */
-			__( 'Freight: $%s', 'wcbom' ),
+			__( 'Freight: $%s', 'pv-bom-stock' ),
 			number_format( $freight, 2 )
 		);
 		$lines[] = sprintf(
 			/* translators: %s: tax cost */
-			__( 'Tax: $%s', 'wcbom' ),
+			__( 'Tax: $%s', 'pv-bom-stock' ),
 			number_format( $tax, 2 )
 		);
 		$lines[] = sprintf(
 			/* translators: %s: other fees */
-			__( 'Fees: $%s', 'wcbom' ),
+			__( 'Fees: $%s', 'pv-bom-stock' ),
 			number_format( $fees, 2 )
 		);
 		$lines[] = sprintf(
 			/* translators: %s: grand total */
-			__( 'Total: $%s', 'wcbom' ),
+			__( 'Total: $%s', 'pv-bom-stock' ),
 			number_format( $total, 2 )
 		);
 
 		if ( null !== $po->notes && '' !== trim( $po->notes ) ) {
 			$lines[] = '';
-			$lines[] = __( 'Notes:', 'wcbom' );
+			$lines[] = __( 'Notes:', 'pv-bom-stock' );
 			$lines[] = $po->notes;
 		}
 

@@ -69,8 +69,8 @@ final class RecommendedPlugins {
 				esc_html( $name ),
 				esc_url( $this->action_url( $basename ) ),
 				file_exists( WP_PLUGIN_DIR . '/' . $basename )
-					? esc_html__( 'Activate', 'wcbom' )
-					: esc_html__( 'Install', 'wcbom' )
+					? esc_html__( 'Activate', 'pv-bom-stock' )
+					: esc_html__( 'Install', 'pv-bom-stock' )
 			);
 		}
 
@@ -81,10 +81,10 @@ final class RecommendedPlugins {
 
 		printf(
 			'<div class="notice notice-info"><p>%s</p><p>%s</p><p><a href="%s">%s</a></p></div>',
-			esc_html__( 'BOM & Stock Manager works best with these free companion plugins: variation swatches give customers a visual option picker, and Extra Product Options powers add-on-conditional BOM lines (text personalization, upgrades). Both are optional — everything else works without them.', 'wcbom' ),
+			esc_html__( 'BOM & Stock Manager works best with these free companion plugins: variation swatches give customers a visual option picker, and Extra Product Options powers add-on-conditional BOM lines (text personalization, upgrades). Both are optional — everything else works without them.', 'pv-bom-stock' ),
 			wp_kses_post( implode( '<br>', $items ) ),
 			esc_url( $dismiss_url ),
-			esc_html__( 'Dismiss this notice permanently', 'wcbom' )
+			esc_html__( 'Dismiss this notice permanently', 'pv-bom-stock' )
 		);
 	}
 

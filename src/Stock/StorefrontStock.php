@@ -161,7 +161,7 @@ final class StorefrontStock {
 				wc_add_notice(
 					sprintf(
 						/* translators: 1: component name, 2: quantity available */
-						__( 'Sorry, "%1$s" doesn\'t have enough stock for this option — only %2$s available.', 'wcbom' ),
+						__( 'Sorry, "%1$s" doesn\'t have enough stock for this option — only %2$s available.', 'pv-bom-stock' ),
 						$component->get_name(),
 						rtrim( rtrim( number_format( $available, 4 ), '0' ), '.' )
 					),

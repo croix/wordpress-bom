@@ -80,7 +80,7 @@ final class LowStockDigest {
 		foreach ( $rows as $row ) {
 			$line = sprintf(
 				/* translators: 1: component name, 2: current stock, 3: threshold, 4: number of products blocked */
-				__( '%1$s: %2$s on hand (threshold %3$s) — blocks %4$d product(s)', 'wcbom' ),
+				__( '%1$s: %2$s on hand (threshold %3$s) — blocks %4$d product(s)', 'pv-bom-stock' ),
 				$row['name'],
 				rtrim( rtrim( number_format( $row['stock'], 4 ), '0' ), '.' ),
 				rtrim( rtrim( number_format( $row['threshold'], 4 ), '0' ), '.' ),
@@ -94,13 +94,13 @@ final class LowStockDigest {
 				$line .= ' — ' . ( null !== $row['on_order_expected']
 					? sprintf(
 						/* translators: 1: quantity on order, 2: expected delivery date */
-						__( '%1$s on order, expected %2$s', 'wcbom' ),
+						__( '%1$s on order, expected %2$s', 'pv-bom-stock' ),
 						rtrim( rtrim( number_format( $row['on_order'], 4 ), '0' ), '.' ),
 						$row['on_order_expected']
 					)
 					: sprintf(
 						/* translators: %s: quantity on order */
-						__( '%s on order', 'wcbom' ),
+						__( '%s on order', 'pv-bom-stock' ),
 						rtrim( rtrim( number_format( $row['on_order'], 4 ), '0' ), '.' )
 					) );
 			}
@@ -112,7 +112,7 @@ final class LowStockDigest {
 			$to,
 			sprintf(
 				/* translators: 1: site name, 2: number of low-stock components */
-				__( '[%1$s] %2$d component(s) low on stock', 'wcbom' ),
+				__( '[%1$s] %2$d component(s) low on stock', 'pv-bom-stock' ),
 				wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ),
 				count( $rows )
 			),

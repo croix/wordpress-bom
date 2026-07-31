@@ -43,10 +43,10 @@ final class ContextualHelp {
 				$screen->add_help_tab(
 					array(
 						'id'      => "wcbom-guide-{$section->id}",
-						'title'   => __( 'BOM & Stock Guide', 'wcbom' ),
+						'title'   => __( 'BOM & Stock Guide', 'pv-bom-stock' ),
 						'content' => '<p>' . esc_html( wp_strip_all_tags( $section->title ) ) . '</p><p><a href="'
 							. esc_url( admin_url( 'admin.php?page=wcbom-guide#' . $section->id ) )
-							. '">' . esc_html__( 'Open the full Guide section', 'wcbom' ) . ' &rarr;</a></p>',
+							. '">' . esc_html__( 'Open the full Guide section', 'pv-bom-stock' ) . ' &rarr;</a></p>',
 					)
 				);
 			}

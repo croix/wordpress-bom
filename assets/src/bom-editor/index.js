@@ -135,9 +135,9 @@ function BomEditor( { productId, restNamespace, variationAttributes, weightFromB
 							? buildable.note
 							: sprintf(
 									/* translators: 1: buildable quantity, 2: bottleneck component name, 3: estimated cost */
-									__( 'Buildable now: %1$d (limited by %2$s) — estimated cost per unit: $%3$s', 'wcbom' ),
+									__( 'Buildable now: %1$d (limited by %2$s) — estimated cost per unit: $%3$s', 'pv-bom-stock' ),
 									buildable.buildable_qty,
-									buildable.bottleneck ? buildable.bottleneck.name : __( 'n/a', 'wcbom' ),
+									buildable.bottleneck ? buildable.bottleneck.name : __( 'n/a', 'pv-bom-stock' ),
 									buildable.estimated_cost
 							  ) }
 					</Notice>
@@ -146,10 +146,10 @@ function BomEditor( { productId, restNamespace, variationAttributes, weightFromB
 				<table className="widefat wcbom-bom-lines">
 					<thead>
 						<tr>
-							<th>{ __( 'Component', 'wcbom' ) }</th>
-							<th>{ __( 'Qty', 'wcbom' ) }</th>
-							<th>{ __( 'Consume when', 'wcbom' ) }</th>
-							<th>{ __( 'Surcharge', 'wcbom' ) }</th>
+							<th>{ __( 'Component', 'pv-bom-stock' ) }</th>
+							<th>{ __( 'Qty', 'pv-bom-stock' ) }</th>
+							<th>{ __( 'Consume when', 'pv-bom-stock' ) }</th>
+							<th>{ __( 'Surcharge', 'pv-bom-stock' ) }</th>
 							<th></th>
 						</tr>
 					</thead>
@@ -170,12 +170,12 @@ function BomEditor( { productId, restNamespace, variationAttributes, weightFromB
 
 				<p>
 					<Button variant="secondary" onClick={ addItem }>
-						{ __( '+ Add line', 'wcbom' ) }
+						{ __( '+ Add line', 'pv-bom-stock' ) }
 					</Button>
 				</p>
 
 				<Button variant="primary" isBusy={ saving } disabled={ saving } onClick={ save }>
-					{ __( 'Save BOM', 'wcbom' ) }
+					{ __( 'Save BOM', 'pv-bom-stock' ) }
 				</Button>
 			</CardBody>
 		</Card>
@@ -200,7 +200,7 @@ function BomLineRow( { item, restNamespace, variationAttributes, weightFromBom, 
 				/>
 				{ missingWeight && (
 					<p className="description wcbom-line-warning">
-						{ __( '⚠ This component has no weight set — it will contribute 0 to the BOM-derived shipping weight.', 'wcbom' ) }
+						{ __( '⚠ This component has no weight set — it will contribute 0 to the BOM-derived shipping weight.', 'pv-bom-stock' ) }
 					</p>
 				) }
 			</td>
@@ -222,9 +222,9 @@ function BomLineRow( { item, restNamespace, variationAttributes, weightFromBom, 
 				<SelectControl
 					value={ item.condition_type }
 					options={ [
-						{ label: __( 'Always', 'wcbom' ), value: CONDITION_ALWAYS },
-						{ label: __( 'Variation attribute', 'wcbom' ), value: CONDITION_ATTRIBUTE },
-						{ label: __( 'Add-on field', 'wcbom' ), value: CONDITION_ADDON },
+						{ label: __( 'Always', 'pv-bom-stock' ), value: CONDITION_ALWAYS },
+						{ label: __( 'Variation attribute', 'pv-bom-stock' ), value: CONDITION_ATTRIBUTE },
+						{ label: __( 'Add-on field', 'pv-bom-stock' ), value: CONDITION_ADDON },
 					] }
 					onChange={ ( condition_type ) =>
 						onChange( { condition_type, condition_key: '', condition_value: '' } )
@@ -238,7 +238,7 @@ function BomLineRow( { item, restNamespace, variationAttributes, weightFromBom, 
 						<SelectControl
 							value={ item.condition_key }
 							options={ [
-								{ label: __( '— attribute —', 'wcbom' ), value: '' },
+								{ label: __( '— attribute —', 'pv-bom-stock' ), value: '' },
 								...variationAttributes.map( ( attr ) => ( {
 									label: attr.label,
 									value: attr.taxonomy,
@@ -251,7 +251,7 @@ function BomLineRow( { item, restNamespace, variationAttributes, weightFromBom, 
 						<SelectControl
 							value={ item.condition_value }
 							options={ [
-								{ label: __( '— value —', 'wcbom' ), value: '' },
+								{ label: __( '— value —', 'pv-bom-stock' ), value: '' },
 								...( attribute ? attribute.terms : [] ).map( ( term ) => ( {
 									label: term.name,
 									value: term.slug,
@@ -267,14 +267,14 @@ function BomLineRow( { item, restNamespace, variationAttributes, weightFromBom, 
 				{ item.condition_type === CONDITION_ADDON && (
 					<>
 						<TextControl
-							placeholder={ __( 'Add-on field name', 'wcbom' ) }
+							placeholder={ __( 'Add-on field name', 'pv-bom-stock' ) }
 							value={ item.condition_key }
 							onChange={ ( condition_key ) => onChange( { condition_key } ) }
 							__next40pxDefaultSize
 							__nextHasNoMarginBottom
 						/>
 						<TextControl
-							placeholder={ __( 'Add-on field value', 'wcbom' ) }
+							placeholder={ __( 'Add-on field value', 'pv-bom-stock' ) }
 							value={ item.condition_value }
 							onChange={ ( condition_value ) => onChange( { condition_value } ) }
 							__next40pxDefaultSize
@@ -288,7 +288,7 @@ function BomLineRow( { item, restNamespace, variationAttributes, weightFromBom, 
 					type="number"
 					step="0.01"
 					min="0"
-					placeholder={ __( 'none', 'wcbom' ) }
+					placeholder={ __( 'none', 'pv-bom-stock' ) }
 					value={ item.surcharge }
 					onChange={ ( surcharge ) => onChange( { surcharge } ) }
 					__next40pxDefaultSize
@@ -296,13 +296,13 @@ function BomLineRow( { item, restNamespace, variationAttributes, weightFromBom, 
 				/>
 				{ surchargeOnAttribute && (
 					<p className="description wcbom-line-warning">
-						{ __( '⚠ Stacks additively with variation pricing — make sure this option doesn\'t already charge more through its own variation price.', 'wcbom' ) }
+						{ __( '⚠ Stacks additively with variation pricing — make sure this option doesn\'t already charge more through its own variation price.', 'pv-bom-stock' ) }
 					</p>
 				) }
 			</td>
 			<td>
 				<Button variant="tertiary" isDestructive onClick={ onRemove }>
-					{ __( 'Remove', 'wcbom' ) }
+					{ __( 'Remove', 'pv-bom-stock' ) }
 				</Button>
 			</td>
 		</tr>

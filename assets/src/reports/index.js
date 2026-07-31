@@ -87,13 +87,13 @@ function BuildableTab( { restNamespace } ) {
 		<ReportTable
 			restNamespace={ restNamespace }
 			path="/reports/buildable"
-			empty={ __( 'No made-to-order products with an active BOM yet.', 'wcbom' ) }
+			empty={ __( 'No made-to-order products with an active BOM yet.', 'pv-bom-stock' ) }
 			columns={ [
-				{ key: 'name', label: __( 'Product', 'wcbom' ) },
-				{ key: 'buildable_qty', label: __( 'Buildable now', 'wcbom' ) },
+				{ key: 'name', label: __( 'Product', 'pv-bom-stock' ) },
+				{ key: 'buildable_qty', label: __( 'Buildable now', 'pv-bom-stock' ) },
 				{
 					key: 'bottleneck',
-					label: __( 'Bottleneck', 'wcbom' ),
+					label: __( 'Bottleneck', 'pv-bom-stock' ),
 					render: ( row ) => ( row.bottleneck ? row.bottleneck.name : '—' ),
 				},
 			] }
@@ -106,12 +106,12 @@ function LowStockTab( { restNamespace } ) {
 		<ReportTable
 			restNamespace={ restNamespace }
 			path="/reports/low-stock"
-			empty={ __( 'Nothing is currently low on stock.', 'wcbom' ) }
+			empty={ __( 'Nothing is currently low on stock.', 'pv-bom-stock' ) }
 			columns={ [
-				{ key: 'name', label: __( 'Component', 'wcbom' ) },
-				{ key: 'stock', label: __( 'On hand', 'wcbom' ), render: ( row ) => formatNumber( row.stock ) },
-				{ key: 'threshold', label: __( 'Threshold', 'wcbom' ), render: ( row ) => formatNumber( row.threshold ) },
-				{ key: 'blocks_products', label: __( 'Blocks', 'wcbom' ), render: ( row ) => `${ row.blocks_products } product(s)` },
+				{ key: 'name', label: __( 'Component', 'pv-bom-stock' ) },
+				{ key: 'stock', label: __( 'On hand', 'pv-bom-stock' ), render: ( row ) => formatNumber( row.stock ) },
+				{ key: 'threshold', label: __( 'Threshold', 'pv-bom-stock' ), render: ( row ) => formatNumber( row.threshold ) },
+				{ key: 'blocks_products', label: __( 'Blocks', 'pv-bom-stock' ), render: ( row ) => `${ row.blocks_products } product(s)` },
 			] }
 		/>
 	);
@@ -122,15 +122,15 @@ function MarginTab( { restNamespace } ) {
 		<ReportTable
 			restNamespace={ restNamespace }
 			path="/reports/margin"
-			empty={ __( 'No made-to-order/manufactured products with an active BOM yet.', 'wcbom' ) }
+			empty={ __( 'No made-to-order/manufactured products with an active BOM yet.', 'pv-bom-stock' ) }
 			columns={ [
-				{ key: 'name', label: __( 'Product', 'wcbom' ) },
-				{ key: 'price', label: __( 'Price', 'wcbom' ), render: ( row ) => formatMoney( row.price ) },
-				{ key: 'cost', label: __( 'BOM cost', 'wcbom' ), render: ( row ) => formatMoney( row.cost ) },
-				{ key: 'margin', label: __( 'Margin', 'wcbom' ), render: ( row ) => formatMoney( row.margin ) },
+				{ key: 'name', label: __( 'Product', 'pv-bom-stock' ) },
+				{ key: 'price', label: __( 'Price', 'pv-bom-stock' ), render: ( row ) => formatMoney( row.price ) },
+				{ key: 'cost', label: __( 'BOM cost', 'pv-bom-stock' ), render: ( row ) => formatMoney( row.cost ) },
+				{ key: 'margin', label: __( 'Margin', 'pv-bom-stock' ), render: ( row ) => formatMoney( row.margin ) },
 				{
 					key: 'margin_pct',
-					label: __( 'Margin %', 'wcbom' ),
+					label: __( 'Margin %', 'pv-bom-stock' ),
 					render: ( row ) => ( null === row.margin_pct ? '—' : `${ row.margin_pct }%` ),
 				},
 			] }
@@ -165,7 +165,7 @@ function UsageTab( { restNamespace } ) {
 	return (
 		<>
 			<TextControl
-				label={ __( 'Search components', 'wcbom' ) }
+				label={ __( 'Search components', 'pv-bom-stock' ) }
 				value={ search }
 				onChange={ ( value ) => {
 					setSearch( value );
@@ -175,9 +175,9 @@ function UsageTab( { restNamespace } ) {
 				__nextHasNoMarginBottom
 			/>
 
-			{ 0 === rows.length && <p>{ __( 'No components yet.', 'wcbom' ) }</p> }
+			{ 0 === rows.length && <p>{ __( 'No components yet.', 'pv-bom-stock' ) }</p> }
 			{ rows.length > 0 && 0 === filtered.length && (
-				<p>{ __( 'No components match your search.', 'wcbom' ) }</p>
+				<p>{ __( 'No components match your search.', 'pv-bom-stock' ) }</p>
 			) }
 
 			{ filtered.length > 0 && (
@@ -185,11 +185,11 @@ function UsageTab( { restNamespace } ) {
 					<table className="widefat striped" style={ { marginTop: '1em' } }>
 						<thead>
 							<tr>
-								<th>{ __( 'Item name', 'wcbom' ) }</th>
-								<th>{ __( 'On hand', 'wcbom' ) }</th>
-								<th>{ __( 'Consumed (30d)', 'wcbom' ) }</th>
-								<th>{ __( 'Consumed (90d)', 'wcbom' ) }</th>
-								<th>{ __( 'Days of stock', 'wcbom' ) }</th>
+								<th>{ __( 'Item name', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'On hand', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Consumed (30d)', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Consumed (90d)', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Days of stock', 'pv-bom-stock' ) }</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -199,7 +199,7 @@ function UsageTab( { restNamespace } ) {
 									<td>{ formatNumber( row.stock ) } { row.unit }</td>
 									<td>{ formatNumber( row.consumed_30d ) }</td>
 									<td>{ formatNumber( row.consumed_90d ) }</td>
-									<td>{ null === row.days_of_stock ? __( 'n/a', 'wcbom' ) : row.days_of_stock }</td>
+									<td>{ null === row.days_of_stock ? __( 'n/a', 'pv-bom-stock' ) : row.days_of_stock }</td>
 								</tr>
 							) ) }
 						</tbody>
@@ -212,15 +212,15 @@ function UsageTab( { restNamespace } ) {
 								disabled={ page_ <= 1 }
 								onClick={ () => setPage( ( p ) => p - 1 ) }
 							>
-								{ __( '‹ Previous', 'wcbom' ) }
+								{ __( '‹ Previous', 'pv-bom-stock' ) }
 							</button>{ ' ' }
-							{ __( 'Page', 'wcbom' ) } { page_ } { __( 'of', 'wcbom' ) } { totalPages }{ ' ' }
+							{ __( 'Page', 'pv-bom-stock' ) } { page_ } { __( 'of', 'pv-bom-stock' ) } { totalPages }{ ' ' }
 							<button
 								className="button"
 								disabled={ page_ >= totalPages }
 								onClick={ () => setPage( ( p ) => p + 1 ) }
 							>
-								{ __( 'Next ›', 'wcbom' ) }
+								{ __( 'Next ›', 'pv-bom-stock' ) }
 							</button>
 						</p>
 					) }
@@ -264,10 +264,10 @@ function LedgerTab( { restNamespace, ledgerExportUrl } ) {
 		<>
 			<div style={ { display: 'flex', gap: '1em', alignItems: 'flex-end', marginBottom: '1em' } }>
 				<SelectControl
-					label={ __( 'Reason', 'wcbom' ) }
+					label={ __( 'Reason', 'pv-bom-stock' ) }
 					value={ reason }
 					options={ [
-						{ label: __( 'All', 'wcbom' ), value: '' },
+						{ label: __( 'All', 'pv-bom-stock' ), value: '' },
 						{ label: 'order', value: 'order' },
 						{ label: 'order_restore', value: 'order_restore' },
 						{ label: 'refund', value: 'refund' },
@@ -285,7 +285,7 @@ function LedgerTab( { restNamespace, ledgerExportUrl } ) {
 					__nextHasNoMarginBottom
 				/>
 				<a className="button" href={ exportHref }>
-					{ __( 'Export CSV', 'wcbom' ) }
+					{ __( 'Export CSV', 'pv-bom-stock' ) }
 				</a>
 			</div>
 
@@ -301,13 +301,13 @@ function LedgerTab( { restNamespace, ledgerExportUrl } ) {
 					<table className="widefat striped">
 						<thead>
 							<tr>
-								<th>{ __( 'Date', 'wcbom' ) }</th>
-								<th>{ __( 'Product', 'wcbom' ) }</th>
-								<th>{ __( 'Delta', 'wcbom' ) }</th>
-								<th>{ __( 'Stock after', 'wcbom' ) }</th>
-								<th>{ __( 'Reason', 'wcbom' ) }</th>
-								<th>{ __( 'Reference', 'wcbom' ) }</th>
-								<th>{ __( 'Note', 'wcbom' ) }</th>
+								<th>{ __( 'Date', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Product', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Delta', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Stock after', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Reason', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Reference', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Note', 'pv-bom-stock' ) }</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -331,15 +331,15 @@ function LedgerTab( { restNamespace, ledgerExportUrl } ) {
 							disabled={ page <= 1 }
 							onClick={ () => setPage( ( p ) => p - 1 ) }
 						>
-							{ __( '‹ Previous', 'wcbom' ) }
+							{ __( '‹ Previous', 'pv-bom-stock' ) }
 						</button>{ ' ' }
-						{ __( 'Page', 'wcbom' ) } { page } { __( 'of', 'wcbom' ) } { totalPages }{ ' ' }
+						{ __( 'Page', 'pv-bom-stock' ) } { page } { __( 'of', 'pv-bom-stock' ) } { totalPages }{ ' ' }
 						<button
 							className="button"
 							disabled={ page >= totalPages }
 							onClick={ () => setPage( ( p ) => p + 1 ) }
 						>
-							{ __( 'Next ›', 'wcbom' ) }
+							{ __( 'Next ›', 'pv-bom-stock' ) }
 						</button>
 					</p>
 				</>
@@ -354,11 +354,11 @@ function ReportsApp( { restNamespace, ledgerExportUrl } ) {
 			<CardBody>
 				<TabPanel
 					tabs={ [
-						{ name: 'buildable', title: __( 'Buildable', 'wcbom' ) },
-						{ name: 'low-stock', title: __( 'Low Stock', 'wcbom' ) },
-						{ name: 'margin', title: __( 'Margin', 'wcbom' ) },
-						{ name: 'usage', title: __( 'Component Usage', 'wcbom' ) },
-						{ name: 'ledger', title: __( 'Ledger', 'wcbom' ) },
+						{ name: 'buildable', title: __( 'Buildable', 'pv-bom-stock' ) },
+						{ name: 'low-stock', title: __( 'Low Stock', 'pv-bom-stock' ) },
+						{ name: 'margin', title: __( 'Margin', 'pv-bom-stock' ) },
+						{ name: 'usage', title: __( 'Component Usage', 'pv-bom-stock' ) },
+						{ name: 'ledger', title: __( 'Ledger', 'pv-bom-stock' ) },
 					] }
 				>
 					{ ( tab ) => {

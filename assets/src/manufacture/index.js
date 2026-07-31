@@ -32,10 +32,10 @@ function formatNumber( n ) {
 }
 
 const STATUS_LABELS = {
-	draft: __( 'Draft', 'wcbom' ),
-	completed: __( 'Completed', 'wcbom' ),
-	partially_reversed: __( 'Partially reversed', 'wcbom' ),
-	reversed: __( 'Reversed', 'wcbom' ),
+	draft: __( 'Draft', 'pv-bom-stock' ),
+	completed: __( 'Completed', 'pv-bom-stock' ),
+	partially_reversed: __( 'Partially reversed', 'pv-bom-stock' ),
+	reversed: __( 'Reversed', 'pv-bom-stock' ),
 };
 
 function ManufactureApp( { restNamespace } ) {
@@ -65,13 +65,13 @@ function ManufactureApp( { restNamespace } ) {
 	}
 
 	function deleteDraft( order ) {
-		if ( ! window.confirm( __( 'Delete this draft manufacture order? Nothing has been built yet, so no stock is affected.', 'wcbom' ) ) ) {
+		if ( ! window.confirm( __( 'Delete this draft manufacture order? Nothing has been built yet, so no stock is affected.', 'pv-bom-stock' ) ) ) {
 			return;
 		}
 
 		apiFetch( { path: `/${ restNamespace }/manufacture-orders/${ order.mo_id }`, method: 'DELETE' } )
 			.then( () => {
-				setNotice( { status: 'success', message: __( 'Draft deleted.', 'wcbom' ) } );
+				setNotice( { status: 'success', message: __( 'Draft deleted.', 'pv-bom-stock' ) } );
 				load();
 			} )
 			.catch( ( err ) => setNotice( { status: 'error', message: err.message || String( err ) } ) );
@@ -79,7 +79,7 @@ function ManufactureApp( { restNamespace } ) {
 
 	function onCreated() {
 		setShowCreate( false );
-		setNotice( { status: 'success', message: __( 'Manufacture order created as a draft. Nothing has been built yet.', 'wcbom' ) } );
+		setNotice( { status: 'success', message: __( 'Manufacture order created as a draft. Nothing has been built yet.', 'pv-bom-stock' ) } );
 		load();
 	}
 
@@ -92,7 +92,7 @@ function ManufactureApp( { restNamespace } ) {
 	return (
 		<Card>
 			<CardBody>
-				<h1>{ __( 'Manufacturing', 'wcbom' ) }</h1>
+				<h1>{ __( 'Manufacturing', 'pv-bom-stock' ) }</h1>
 
 				{ notice && (
 					<Notice status={ notice.status } onRemove={ () => setNotice( null ) }>
@@ -102,10 +102,10 @@ function ManufactureApp( { restNamespace } ) {
 
 				<p>
 					<SelectControl
-						label={ __( 'Status', 'wcbom' ) }
+						label={ __( 'Status', 'pv-bom-stock' ) }
 						value={ statusFilter }
 						options={ [
-							{ label: __( 'All', 'wcbom' ), value: '' },
+							{ label: __( 'All', 'pv-bom-stock' ), value: '' },
 							...Object.entries( STATUS_LABELS ).map( ( [ value, label ] ) => ( { label, value } ) ),
 						] }
 						onChange={ setStatusFilter }
@@ -116,7 +116,7 @@ function ManufactureApp( { restNamespace } ) {
 
 				<p>
 					<Button variant="primary" onClick={ () => setShowCreate( true ) }>
-						{ __( '+ New manufacture order', 'wcbom' ) }
+						{ __( '+ New manufacture order', 'pv-bom-stock' ) }
 					</Button>
 				</p>
 
@@ -126,12 +126,12 @@ function ManufactureApp( { restNamespace } ) {
 					<table className="widefat wcbom-mo-table">
 						<thead>
 							<tr>
-								<th>{ __( 'ID', 'wcbom' ) }</th>
-								<th>{ __( 'Product', 'wcbom' ) }</th>
-								<th>{ __( 'Built', 'wcbom' ) }</th>
-								<th>{ __( 'Reversed', 'wcbom' ) }</th>
-								<th>{ __( 'Status', 'wcbom' ) }</th>
-								<th>{ __( 'Created', 'wcbom' ) }</th>
+								<th>{ __( 'ID', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Product', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Built', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Reversed', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Status', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Created', 'pv-bom-stock' ) }</th>
 								<th></th>
 							</tr>
 						</thead>
@@ -148,22 +148,22 @@ function ManufactureApp( { restNamespace } ) {
 										{ 'draft' === order.status && (
 											<>
 												<Button variant="primary" onClick={ () => openDetail( order, 'complete' ) }>
-													{ __( 'Complete', 'wcbom' ) }
+													{ __( 'Complete', 'pv-bom-stock' ) }
 												</Button>{ ' ' }
 												<Button variant="tertiary" isDestructive onClick={ () => deleteDraft( order ) }>
-													{ __( 'Delete', 'wcbom' ) }
+													{ __( 'Delete', 'pv-bom-stock' ) }
 												</Button>
 											</>
 										) }
 										{ ( 'completed' === order.status || 'partially_reversed' === order.status ) && (
 											<Button variant="secondary" onClick={ () => openDetail( order, 'reverse' ) }>
-												{ __( 'Reverse', 'wcbom' ) }
+												{ __( 'Reverse', 'pv-bom-stock' ) }
 											</Button>
 										) }
 										{ ( 'completed' === order.status || 'partially_reversed' === order.status || 'reversed' === order.status ) && (
 											<>{ ' ' }
 												<Button variant="tertiary" onClick={ () => openDetail( order, 'view' ) }>
-													{ __( 'View', 'wcbom' ) }
+													{ __( 'View', 'pv-bom-stock' ) }
 												</Button>
 											</>
 										) }
@@ -172,7 +172,7 @@ function ManufactureApp( { restNamespace } ) {
 							) ) }
 							{ 0 === orders.length && (
 								<tr>
-									<td colSpan={ 7 }>{ __( 'No manufacture orders yet.', 'wcbom' ) }</td>
+									<td colSpan={ 7 }>{ __( 'No manufacture orders yet.', 'pv-bom-stock' ) }</td>
 								</tr>
 							) }
 						</tbody>
@@ -189,7 +189,7 @@ function ManufactureApp( { restNamespace } ) {
 					restNamespace={ restNamespace }
 					order={ detailOrder.order }
 					onClose={ () => setDetailOrder( null ) }
-					onCompleted={ () => onActioned( __( 'Manufacture order completed.', 'wcbom' ) ) }
+					onCompleted={ () => onActioned( __( 'Manufacture order completed.', 'pv-bom-stock' ) ) }
 				/>
 			) }
 
@@ -198,7 +198,7 @@ function ManufactureApp( { restNamespace } ) {
 					restNamespace={ restNamespace }
 					order={ detailOrder.order }
 					onClose={ () => setDetailOrder( null ) }
-					onReversed={ () => onActioned( __( 'Manufacture order reversed.', 'wcbom' ) ) }
+					onReversed={ () => onActioned( __( 'Manufacture order reversed.', 'pv-bom-stock' ) ) }
 				/>
 			) }
 
@@ -235,7 +235,7 @@ function CreateModal( { restNamespace, onClose, onCreated } ) {
 
 		const qty = parseInt( qtyBuilt, 10 );
 		if ( ! qty || qty <= 0 ) {
-			setError( __( 'Enter a quantity to build.', 'wcbom' ) );
+			setError( __( 'Enter a quantity to build.', 'pv-bom-stock' ) );
 			return;
 		}
 
@@ -243,14 +243,14 @@ function CreateModal( { restNamespace, onClose, onCreated } ) {
 
 		if ( 'existing' === mode ) {
 			if ( ! productId ) {
-				setError( __( 'Choose a product to restock.', 'wcbom' ) );
+				setError( __( 'Choose a product to restock.', 'pv-bom-stock' ) );
 				return;
 			}
 			payload.mode = 'existing';
 			payload.product_id = parseInt( productId, 10 );
 		} else {
 			if ( ! templateId || ! title.trim() ) {
-				setError( __( 'Choose a template and enter a title.', 'wcbom' ) );
+				setError( __( 'Choose a template and enter a title.', 'pv-bom-stock' ) );
 				return;
 			}
 			payload.mode = 'template';
@@ -268,7 +268,7 @@ function CreateModal( { restNamespace, onClose, onCreated } ) {
 	}
 
 	return (
-		<Modal title={ __( 'New manufacture order', 'wcbom' ) } onRequestClose={ onClose }>
+		<Modal title={ __( 'New manufacture order', 'pv-bom-stock' ) } onRequestClose={ onClose }>
 			{ error && (
 				<Notice status="error" isDismissible={ false }>
 					{ error }
@@ -277,11 +277,11 @@ function CreateModal( { restNamespace, onClose, onCreated } ) {
 
 			<Field>
 				<RadioControl
-					label={ __( 'What are you building?', 'wcbom' ) }
+					label={ __( 'What are you building?', 'pv-bom-stock' ) }
 					selected={ mode }
 					options={ [
-						{ label: __( 'Restock an existing manufactured product', 'wcbom' ), value: 'existing' },
-						{ label: __( 'New product from a template', 'wcbom' ), value: 'template' },
+						{ label: __( 'Restock an existing manufactured product', 'pv-bom-stock' ), value: 'existing' },
+						{ label: __( 'New product from a template', 'pv-bom-stock' ), value: 'template' },
 					] }
 					onChange={ setMode }
 				/>
@@ -290,10 +290,10 @@ function CreateModal( { restNamespace, onClose, onCreated } ) {
 			{ 'existing' === mode && (
 				<Field>
 					<SelectControl
-						label={ __( 'Product', 'wcbom' ) }
+						label={ __( 'Product', 'pv-bom-stock' ) }
 						value={ productId }
 						options={ [
-							{ label: __( '— choose —', 'wcbom' ), value: '' },
+							{ label: __( '— choose —', 'pv-bom-stock' ), value: '' },
 							...existing.map( ( p ) => ( { label: `${ p.name } (${ p.stock } on hand)`, value: String( p.id ) } ) ),
 						] }
 						onChange={ setProductId }
@@ -306,10 +306,10 @@ function CreateModal( { restNamespace, onClose, onCreated } ) {
 				<>
 					<Field>
 						<SelectControl
-							label={ __( 'Template', 'wcbom' ) }
+							label={ __( 'Template', 'pv-bom-stock' ) }
 							value={ templateId }
 							options={ [
-								{ label: __( '— choose —', 'wcbom' ), value: '' },
+								{ label: __( '— choose —', 'pv-bom-stock' ), value: '' },
 								...templates.map( ( t ) => ( { label: t.name, value: String( t.id ) } ) ),
 							] }
 							onChange={ ( value ) => {
@@ -326,7 +326,7 @@ function CreateModal( { restNamespace, onClose, onCreated } ) {
 								label={ attr.label }
 								value={ attributes[ attr.taxonomy ] || '' }
 								options={ [
-									{ label: __( '— choose —', 'wcbom' ), value: '' },
+									{ label: __( '— choose —', 'pv-bom-stock' ), value: '' },
 									...attr.terms.map( ( term ) => ( { label: term.name, value: term.slug } ) ),
 								] }
 								onChange={ ( value ) => setAttributes( { ...attributes, [ attr.taxonomy ]: value } ) }
@@ -337,7 +337,7 @@ function CreateModal( { restNamespace, onClose, onCreated } ) {
 
 					<Field>
 						<TextControl
-							label={ __( 'New product title', 'wcbom' ) }
+							label={ __( 'New product title', 'pv-bom-stock' ) }
 							value={ title }
 							onChange={ setTitle }
 							__next40pxDefaultSize
@@ -345,7 +345,7 @@ function CreateModal( { restNamespace, onClose, onCreated } ) {
 					</Field>
 					<Field>
 						<TextControl
-							label={ __( 'Price', 'wcbom' ) }
+							label={ __( 'Price', 'pv-bom-stock' ) }
 							type="number"
 							step="0.01"
 							value={ price }
@@ -358,7 +358,7 @@ function CreateModal( { restNamespace, onClose, onCreated } ) {
 
 			<Field>
 				<TextControl
-					label={ __( 'Quantity to build', 'wcbom' ) }
+					label={ __( 'Quantity to build', 'pv-bom-stock' ) }
 					type="number"
 					min="1"
 					value={ qtyBuilt }
@@ -369,7 +369,7 @@ function CreateModal( { restNamespace, onClose, onCreated } ) {
 
 			<Field>
 				<TextControl
-					label={ __( 'Notes (optional)', 'wcbom' ) }
+					label={ __( 'Notes (optional)', 'pv-bom-stock' ) }
 					value={ notes }
 					onChange={ setNotes }
 					__next40pxDefaultSize
@@ -378,10 +378,10 @@ function CreateModal( { restNamespace, onClose, onCreated } ) {
 
 			<p>
 				<Button variant="primary" isBusy={ submitting } disabled={ submitting } onClick={ submit }>
-					{ __( 'Create draft', 'wcbom' ) }
+					{ __( 'Create draft', 'pv-bom-stock' ) }
 				</Button>{ ' ' }
 				<Button variant="tertiary" disabled={ submitting } onClick={ onClose }>
-					{ __( 'Cancel', 'wcbom' ) }
+					{ __( 'Cancel', 'pv-bom-stock' ) }
 				</Button>
 			</p>
 		</Modal>
@@ -413,7 +413,7 @@ function CompleteModal( { restNamespace, order, onClose, onCompleted } ) {
 	return (
 		<Modal title={ sprintf(
 			/* translators: %d: manufacture order ID */
-			__( 'Complete MO #%d', 'wcbom' ),
+			__( 'Complete MO #%d', 'pv-bom-stock' ),
 			order.mo_id
 		) } onRequestClose={ onClose }>
 			{ error && (
@@ -425,7 +425,7 @@ function CompleteModal( { restNamespace, order, onClose, onCompleted } ) {
 			<p>
 				{ sprintf(
 					/* translators: 1: quantity, 2: product name */
-					__( 'Building %1$d × %2$s will consume:', 'wcbom' ),
+					__( 'Building %1$d × %2$s will consume:', 'pv-bom-stock' ),
 					order.qty_built,
 					order.product_name
 				) }
@@ -434,9 +434,9 @@ function CompleteModal( { restNamespace, order, onClose, onCompleted } ) {
 			<table className="widefat">
 				<thead>
 					<tr>
-						<th>{ __( 'Component', 'wcbom' ) }</th>
-						<th>{ __( 'Required', 'wcbom' ) }</th>
-						<th>{ __( 'On hand', 'wcbom' ) }</th>
+						<th>{ __( 'Component', 'pv-bom-stock' ) }</th>
+						<th>{ __( 'Required', 'pv-bom-stock' ) }</th>
+						<th>{ __( 'On hand', 'pv-bom-stock' ) }</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -453,11 +453,11 @@ function CompleteModal( { restNamespace, order, onClose, onCompleted } ) {
 			{ hasShortage && (
 				<>
 					<Notice status="warning" isDismissible={ false }>
-						{ __( 'One or more components are short. Building anyway will take that component negative.', 'wcbom' ) }
+						{ __( 'One or more components are short. Building anyway will take that component negative.', 'pv-bom-stock' ) }
 					</Notice>
 					<Field>
 						<CheckboxControl
-							label={ __( 'Build anyway (allow negative stock)', 'wcbom' ) }
+							label={ __( 'Build anyway (allow negative stock)', 'pv-bom-stock' ) }
 							checked={ allowNegative }
 							onChange={ setAllowNegative }
 						/>
@@ -472,10 +472,10 @@ function CompleteModal( { restNamespace, order, onClose, onCompleted } ) {
 					disabled={ submitting || ( hasShortage && ! allowNegative ) }
 					onClick={ submit }
 				>
-					{ __( 'Complete', 'wcbom' ) }
+					{ __( 'Complete', 'pv-bom-stock' ) }
 				</Button>{ ' ' }
 				<Button variant="tertiary" disabled={ submitting } onClick={ onClose }>
-					{ __( 'Cancel', 'wcbom' ) }
+					{ __( 'Cancel', 'pv-bom-stock' ) }
 				</Button>
 			</p>
 		</Modal>
@@ -494,7 +494,7 @@ function ReverseModal( { restNamespace, order, onClose, onReversed } ) {
 		if ( ! parsedQty || parsedQty < 1 || parsedQty > order.remaining ) {
 			setError( sprintf(
 				/* translators: %d: maximum number of units still available to reverse */
-				__( 'Enter between 1 and %d unit(s).', 'wcbom' ),
+				__( 'Enter between 1 and %d unit(s).', 'pv-bom-stock' ),
 				order.remaining
 			) );
 			return;
@@ -520,7 +520,7 @@ function ReverseModal( { restNamespace, order, onClose, onReversed } ) {
 	return (
 		<Modal title={ sprintf(
 			/* translators: %d: manufacture order ID */
-			__( 'Reverse MO #%d', 'wcbom' ),
+			__( 'Reverse MO #%d', 'pv-bom-stock' ),
 			order.mo_id
 		) } onRequestClose={ onClose }>
 			{ error && (
@@ -533,7 +533,7 @@ function ReverseModal( { restNamespace, order, onClose, onReversed } ) {
 				<TextControl
 					label={ sprintf(
 						/* translators: %d: maximum number of units still available to reverse */
-						__( 'Units to reverse (max %d)', 'wcbom' ),
+						__( 'Units to reverse (max %d)', 'pv-bom-stock' ),
 						order.remaining
 					) }
 					type="number"
@@ -545,7 +545,7 @@ function ReverseModal( { restNamespace, order, onClose, onReversed } ) {
 				/>
 			</Field>
 
-			<p><strong>{ __( 'Scrap (check any component that was NOT recoverable and should not be restored):', 'wcbom' ) }</strong></p>
+			<p><strong>{ __( 'Scrap (check any component that was NOT recoverable and should not be restored):', 'pv-bom-stock' ) }</strong></p>
 			<div style={ { marginBottom: '16px' } }>
 				{ order.items.map( ( item ) => (
 					<div key={ item.component_id } style={ { marginBottom: '8px' } }>
@@ -560,10 +560,10 @@ function ReverseModal( { restNamespace, order, onClose, onReversed } ) {
 
 			<p>
 				<Button variant="primary" isBusy={ submitting } disabled={ submitting } onClick={ submit }>
-					{ __( 'Reverse', 'wcbom' ) }
+					{ __( 'Reverse', 'pv-bom-stock' ) }
 				</Button>{ ' ' }
 				<Button variant="tertiary" disabled={ submitting } onClick={ onClose }>
-					{ __( 'Cancel', 'wcbom' ) }
+					{ __( 'Cancel', 'pv-bom-stock' ) }
 				</Button>
 			</p>
 		</Modal>
@@ -574,22 +574,22 @@ function ViewModal( { order, onClose } ) {
 	return (
 		<Modal title={ sprintf(
 			/* translators: 1: manufacture order ID, 2: finished product name */
-			__( 'MO #%1$d — %2$s', 'wcbom' ),
+			__( 'MO #%1$d — %2$s', 'pv-bom-stock' ),
 			order.mo_id,
 			order.product_name
 		) } onRequestClose={ onClose }>
 			<p>
-				{ STATUS_LABELS[ order.status ] || order.status } — { __( 'built', 'wcbom' ) } { order.qty_built }, { __( 'reversed', 'wcbom' ) } { order.qty_reversed }
+				{ STATUS_LABELS[ order.status ] || order.status } — { __( 'built', 'pv-bom-stock' ) } { order.qty_built }, { __( 'reversed', 'pv-bom-stock' ) } { order.qty_reversed }
 			</p>
 			{ order.notes && <p>{ order.notes }</p> }
 
 			<table className="widefat wcbom-pick-list">
 				<thead>
 					<tr>
-						<th>{ __( 'Component', 'wcbom' ) }</th>
-						<th>{ __( 'Per unit', 'wcbom' ) }</th>
-						<th>{ __( 'Total consumed', 'wcbom' ) }</th>
-						<th>{ __( 'Unit cost', 'wcbom' ) }</th>
+						<th>{ __( 'Component', 'pv-bom-stock' ) }</th>
+						<th>{ __( 'Per unit', 'pv-bom-stock' ) }</th>
+						<th>{ __( 'Total consumed', 'pv-bom-stock' ) }</th>
+						<th>{ __( 'Unit cost', 'pv-bom-stock' ) }</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -606,10 +606,10 @@ function ViewModal( { order, onClose } ) {
 
 			<p>
 				<Button variant="secondary" onClick={ () => window.print() }>
-					{ __( 'Print pick list', 'wcbom' ) }
+					{ __( 'Print pick list', 'pv-bom-stock' ) }
 				</Button>{ ' ' }
 				<Button variant="tertiary" onClick={ onClose }>
-					{ __( 'Close', 'wcbom' ) }
+					{ __( 'Close', 'pv-bom-stock' ) }
 				</Button>
 			</p>
 		</Modal>

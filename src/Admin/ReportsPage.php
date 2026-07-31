@@ -47,8 +47,8 @@ final class ReportsPage {
 	public function add_menu_page(): void {
 		$this->hook_suffix = add_submenu_page(
 			PluginMenu::SLUG,
-			__( 'Reports', 'wcbom' ),
-			__( 'Reports', 'wcbom' ),
+			__( 'Reports', 'pv-bom-stock' ),
+			__( 'Reports', 'pv-bom-stock' ),
 			'manage_woocommerce',
 			'wcbom-reports',
 			array( $this, 'render_page' )
@@ -62,11 +62,11 @@ final class ReportsPage {
 	 */
 	public function render_page(): void {
 		echo '<div class="wrap">';
-		echo '<h1>' . esc_html__( 'Reports', 'wcbom' ) . '</h1>';
+		echo '<h1>' . esc_html__( 'Reports', 'pv-bom-stock' ) . '</h1>';
 
 		$this->render_bom_csv_forms();
 
-		echo '<div id="wcbom-reports-root"><p>' . esc_html__( 'Loading Reports…', 'wcbom' ) . '</p></div>';
+		echo '<div id="wcbom-reports-root"><p>' . esc_html__( 'Loading Reports…', 'pv-bom-stock' ) . '</p></div>';
 		echo '</div>';
 	}
 
@@ -79,16 +79,16 @@ final class ReportsPage {
 		$export_url = wp_nonce_url( admin_url( 'admin-post.php?action=wcbom_export_boms' ), IE::NONCE_ACTION );
 
 		echo '<div class="card" style="max-width:none;padding:1em 2em;margin-bottom:1em;">';
-		echo '<h2>' . esc_html__( 'Import / Export BOMs', 'wcbom' ) . '</h2>';
-		echo '<p>' . esc_html__( 'CSV, keyed by SKU so a file exported from one site can be imported into another. Importing replaces the whole BOM for every parent SKU in the file — the same full-replace behavior as saving in the BOM editor.', 'wcbom' ) . '</p>';
+		echo '<h2>' . esc_html__( 'Import / Export BOMs', 'pv-bom-stock' ) . '</h2>';
+		echo '<p>' . esc_html__( 'CSV, keyed by SKU so a file exported from one site can be imported into another. Importing replaces the whole BOM for every parent SKU in the file — the same full-replace behavior as saving in the BOM editor.', 'pv-bom-stock' ) . '</p>';
 
-		echo '<p><a class="button" href="' . esc_url( $export_url ) . '">' . esc_html__( 'Download BOMs CSV', 'wcbom' ) . '</a></p>';
+		echo '<p><a class="button" href="' . esc_url( $export_url ) . '">' . esc_html__( 'Download BOMs CSV', 'pv-bom-stock' ) . '</a></p>';
 
 		echo '<form method="post" enctype="multipart/form-data" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		wp_nonce_field( IE::NONCE_ACTION );
 		echo '<input type="hidden" name="action" value="wcbom_import_boms" />';
 		echo '<input type="file" name="file" accept=".csv" required="required" /> ';
-		echo '<button type="submit" class="button button-primary">' . esc_html__( 'Upload BOMs CSV', 'wcbom' ) . '</button>';
+		echo '<button type="submit" class="button button-primary">' . esc_html__( 'Upload BOMs CSV', 'pv-bom-stock' ) . '</button>';
 		echo '</form>';
 		echo '</div>';
 	}

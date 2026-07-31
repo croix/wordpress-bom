@@ -43,7 +43,7 @@ final class BomCsv {
 		if ( false === $fh ) {
 			return array(
 				'csv'      => '',
-				'warnings' => array( __( 'Could not open a temporary stream for export.', 'wcbom' ) ),
+				'warnings' => array( __( 'Could not open a temporary stream for export.', 'pv-bom-stock' ) ),
 			);
 		}
 
@@ -59,7 +59,7 @@ final class BomCsv {
 			if ( '' === $parent_sku ) {
 				$warnings[] = sprintf(
 					/* translators: %s: product name */
-					__( 'Skipped "%s" — it has no SKU, so its BOM can\'t round-trip by SKU.', 'wcbom' ),
+					__( 'Skipped "%s" — it has no SKU, so its BOM can\'t round-trip by SKU.', 'pv-bom-stock' ),
 					$parent->get_name()
 				);
 				continue;
@@ -71,7 +71,7 @@ final class BomCsv {
 				if ( ! $component || '' === $component_sku ) {
 					$warnings[] = sprintf(
 						/* translators: 1: product name, 2: component name or ID */
-						__( 'Skipped a line on "%1$s" — its component (%2$s) has no SKU.', 'wcbom' ),
+						__( 'Skipped a line on "%1$s" — its component (%2$s) has no SKU.', 'pv-bom-stock' ),
 						$parent->get_name(),
 						$component ? $component->get_name() : '#' . $item->component_id
 					);
@@ -120,7 +120,7 @@ final class BomCsv {
 		if ( false === $fh ) {
 			return array(
 				'updated' => array(),
-				'errors'  => array( __( 'Could not open a temporary stream for import.', 'wcbom' ) ),
+				'errors'  => array( __( 'Could not open a temporary stream for import.', 'pv-bom-stock' ) ),
 			);
 		}
 		fwrite( $fh, $csv_content ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- writes to the in-memory stream above.
@@ -177,7 +177,7 @@ final class BomCsv {
 				'name'  => null,
 				'error' => sprintf(
 					/* translators: %s: SKU */
-					__( 'Row referencing parent SKU "%s": no product with that SKU exists — skipped.', 'wcbom' ),
+					__( 'Row referencing parent SKU "%s": no product with that SKU exists — skipped.', 'pv-bom-stock' ),
 					$parent_sku
 				),
 			);
@@ -191,7 +191,7 @@ final class BomCsv {
 					'name'  => null,
 					'error' => sprintf(
 						/* translators: 1: line number, 2: component SKU, 3: parent SKU */
-						__( 'Line %1$d: component SKU "%2$s" not found — "%3$s"\'s whole BOM was skipped (a partial import would be an incomplete recipe).', 'wcbom' ),
+						__( 'Line %1$d: component SKU "%2$s" not found — "%3$s"\'s whole BOM was skipped (a partial import would be an incomplete recipe).', 'pv-bom-stock' ),
 						$row['line'],
 						$row['component_sku'],
 						$parent_sku
@@ -205,7 +205,7 @@ final class BomCsv {
 					'name'  => null,
 					'error' => sprintf(
 						/* translators: 1: line number, 2: condition_type value, 3: parent SKU */
-						__( 'Line %1$d: invalid condition_type "%2$s" — "%3$s"\'s whole BOM was skipped.', 'wcbom' ),
+						__( 'Line %1$d: invalid condition_type "%2$s" — "%3$s"\'s whole BOM was skipped.', 'pv-bom-stock' ),
 						$row['line'],
 						$condition_type,
 						$parent_sku
@@ -230,7 +230,7 @@ final class BomCsv {
 				'name'  => null,
 				'error' => sprintf(
 					/* translators: %s: parent SKU */
-					__( 'Parent SKU "%s" had no valid lines — skipped.', 'wcbom' ),
+					__( 'Parent SKU "%s" had no valid lines — skipped.', 'pv-bom-stock' ),
 					$parent_sku
 				),
 			);
@@ -243,7 +243,7 @@ final class BomCsv {
 				'name'  => null,
 				'error' => sprintf(
 					/* translators: 1: parent SKU, 2: rejection reason (already a full sentence) */
-					__( '"%1$s"\'s whole BOM was skipped: %2$s', 'wcbom' ),
+					__( '"%1$s"\'s whole BOM was skipped: %2$s', 'pv-bom-stock' ),
 					$parent_sku,
 					$e->getMessage()
 				),

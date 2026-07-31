@@ -9,7 +9,7 @@ parameters:
         maximumNumberOfProcesses: 1
     paths:
         - src
-        - wc-bom-stock.php
+        - pv-bom-stock.php
         - uninstall.php
     excludePaths:
         - vendor (?)

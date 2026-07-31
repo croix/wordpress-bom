@@ -45,7 +45,7 @@ final class SampleData {
 	 */
 	public function install(): array {
 		if ( $this->is_installed() ) {
-			throw new \RuntimeException( esc_html__( 'Sample products are already installed.', 'wcbom' ) );
+			throw new \RuntimeException( esc_html__( 'Sample products are already installed.', 'pv-bom-stock' ) );
 		}
 
 		$components = $this->create_components();
@@ -102,7 +102,7 @@ final class SampleData {
 			throw new \RuntimeException(
 				sprintf(
 					/* translators: %s: comma-separated product names */
-					esc_html__( 'Sample components are used in your own BOMs (%s). Remove them from those BOMs first.', 'wcbom' ),
+					esc_html__( 'Sample components are used in your own BOMs (%s). Remove them from those BOMs first.', 'pv-bom-stock' ),
 					esc_html( implode( ', ', array_map( 'strval', $foreign_users ) ) )
 				)
 			);
