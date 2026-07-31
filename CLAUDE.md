@@ -37,7 +37,7 @@ One-stop, ordered runbook. The Progress Log below has the full story of *why*; t
 - Homebrew: `which brew`. If missing: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`. **On Intel, there is only one correct prefix, `/usr/local`** — none of the dual-Homebrew/Rosetta gotchas in the Progress Log below apply; those were specific to the arm64 build machine having only an emulated Intel Homebrew.
 - Node: `node -v`. If missing: `brew install node`.
 - Command Line Tools: `xcode-select -p`. If it errors: `xcode-select --install` (GUI installer, needs you at the keyboard).
-- Docker Desktop: `docker info`. If missing: `brew install --cask docker`, then launch `/Applications/Docker.app` and complete first-run setup yourself (license + privileged-helper password prompt — can't be scripted).
+- Docker Desktop: `docker info`. If missing: `brew install --cask docker-desktop` (Homebrew renamed the cask from `docker` to `docker-desktop`; the old name still resolves today via alias but may not forever), then launch `/Applications/Docker.app` and complete first-run setup yourself (license + privileged-helper password prompt — can't be scripted). **The cask install itself also needs an interactive sudo password** (creates `/usr/local/cli-plugins`) — run it from a real Terminal, not a non-interactive/sandboxed shell, or it fails with "a terminal is required to read the password" and Homebrew rolls the install back.
 - Composer (pulls PHP as a dependency): `composer --version`. If missing: `brew install composer`.
 
 **2. Clone and install dependencies:**
@@ -55,15 +55,23 @@ npx wp-env start
 ```
 Give it a few minutes (first run pulls/builds Docker images). Check `docker ps` — you should see 4+ containers (mysql, wordpress, cli, phpmyadmin, plus `tests-*` variants). If so, skip to step 4.
 
-**If it silently stalls** (only the `mysql` container ever appears, command exits 0 with no error) — this happened reliably on the arm64 build machine, cause unconfirmed (possibly specific to running through Claude Code's sandboxed shell rather than a real Terminal, so it may just work fine here). Manual fallback:
+**If it silently stalls** (only the `mysql` container ever appears, command exits 0 with no error) — happened reliably on both the arm64 build machine and the Intel home laptop when run through Claude Code's sandboxed shell; **confirmed NOT Terminal-specific** — cause still unconfirmed, but it's consistent enough across machines to expect it and go straight to the fallback. Manual fallback:
 ```
 cd ~/.wp-env/<hash>          # find <hash> via: ls ~/.wp-env/
-# Check each plugin folder actually has its main file:
+# Each plugin's bind-mount SOURCE is the top-level ~/.wp-env/<hash>/<slug>/ folder
+# (sibling to WordPress/), NOT WordPress/wp-content/plugins/<slug>/ — the WordPress/
+# folder is itself a separate bind mount, and the individual per-plugin mounts get
+# layered on top of it, shadowing anything placed at that path inside WordPress/.
 ls woocommerce/*.php woo-extra-product-options/*.php variation-swatches-woo/*.php
-# For any that are missing/incomplete, redo it directly:
-curl -fSL https://downloads.wordpress.org/plugin/<slug>.zip -o /tmp/<slug>.zip
-unzip -q /tmp/<slug>.zip -d ~/.wp-env/<hash>/
+# For any that are missing/incomplete/empty, redo it directly. wp-env's own downloaded
+# zips are usually already sitting in this same directory (<slug>.zip) — reuse them
+# rather than re-downloading if present:
+unzip -q <slug>.zip -d ~/.wp-env/<hash>/          # or curl -fSL https://downloads.wordpress.org/plugin/<slug>.zip -o /tmp/<slug>.zip && unzip -q /tmp/<slug>.zip -d ~/.wp-env/<hash>/
 docker compose up -d
+# If you had to delete-and-recreate a plugin's top-level folder (rather than editing
+# its contents in place), the running cli/wordpress containers won't see the new
+# content until restarted — this bit us on the Intel laptop (2026-07-30):
+docker compose restart cli wordpress
 docker compose exec -T cli wp core install --path=/var/www/html --url="http://localhost:8888" --title="wc-bom-stock dev" --admin_user=admin --admin_password=password --admin_email=[redacted] --skip-email
 docker compose exec -T cli wp plugin activate woocommerce woo-extra-product-options variation-swatches-woo wordpress-bom/wc-bom-stock.php --path=/var/www/html
 docker compose exec -T cli wp wcbom seed --path=/var/www/html
@@ -136,6 +144,26 @@ Update this checklist as phases complete. Remaining open decisions are in BUILD_
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-07-30 — Home Intel laptop: full environment stood up for the first time, two real gotchas found
+
+First time actually running this build on the Intel home laptop referenced throughout the Multi-machine note. Confirmed `uname -m` → `x86_64` and Homebrew at `/usr/local` (the correct native prefix here, no Rosetta scrutiny needed, as already documented).
+
+**What was installed fresh:** Composer (pulled PHP 8.5.9 as a dependency) and Docker Desktop via `brew install --cask docker-desktop`. Two things updated in the runbook above as a result:
+- **Homebrew's cask is now named `docker-desktop`**, not `docker` (the old name still resolves via alias today but may not indefinitely).
+- **The cask install itself needs an interactive sudo password** (to create `/usr/local/cli-plugins`) — failed twice with "a terminal is required to read the password" when run from Claude Code's sandboxed shell, and Homebrew cleanly rolled back both times (no half-installed state left behind). the developer ran it himself in a real Terminal; worked immediately.
+
+`composer install` and `npm install` both succeeded cleanly against the committed lockfiles — no version drift between machines.
+
+**`npx wp-env start` silently stalled** — same symptom as the arm64 build machine (only `mysql` container came up, exit 0, no error) — but this time on a *different* machine, which rules out the "maybe it's arm64-specific" theory floated 2026-07-29; **it's Claude Code's sandboxed shell specifically**, not Terminal, not architecture. Went straight to the documented manual fallback.
+
+**Two new real gotchas found while doing the fallback, not previously documented (both now folded into the runbook above):**
+1. **Wrong extraction target the first time.** Assumed the fallback's `unzip -d ~/.wp-env/<hash>/` target from the runbook meant `WordPress/wp-content/plugins/<slug>/` and extracted there — plugins showed up on the host but the `cli` container still reported `wp plugin activate` couldn't find any of them. `docker inspect`'d the container's actual mounts and found each plugin is bind-mounted **individually**, straight from the top-level `~/.wp-env/<hash>/<slug>/` folder (a sibling of `WordPress/`, not nested inside it) — that per-plugin mount layers on top of and shadows whatever's sitting at that same path inside the separate `WordPress/` bind mount. Moved the extraction to the correct top-level path and it worked immediately.
+2. **Recreating that folder didn't take effect until the containers were restarted.** After `rmdir`-ing the empty auto-created mount-source folder and re-extracting fresh in its place, the `cli` container kept seeing an empty directory — `docker compose restart cli wordpress` was needed before the bind mount reflected the new content. Editing an existing mounted folder's contents in place doesn't have this problem; only delete-and-recreate does.
+
+**Fully verified end-to-end after the fix:** WP core install, all 4 plugins (`woocommerce`, `woo-extra-product-options`, `variation-swatches-woo`, `wordpress-bom`) activated with `Success: Activated 4 of 4 plugins.`, `wp wcbom seed` produced the expected 12 products, `wp plugin list` shows all four active with no update-available/error state, `debug.log` absent (clean) both via CLI and after a real logged-in browser session on the Component Inventory screen (confirmed seeded stock data rendering correctly: 24oz Blank Tumbler 100ea, Epoxy 200ml, Glitter Blue/Pink 500g each, Standard Cap/Straw 300ea each). This machine is now a working second build environment, matching the arm64 machine's state as of the last Phase 6 session (nothing built here yet — Phases 0–6 already existed in the repo, this session only stood up the *environment* to run them).
+
+Did not yet run the PHPUnit integration suite here — the WP-core PHPUnit test-suite files (`tests/phpunit`, fetched via `git clone --sparse`) are a separate one-time-per-machine step documented below and weren't needed for this session's goal of just getting the dev environment live.
 
 ### 2026-07-30 — Scope addition: in-app documentation & training module spec'd (§5.12, Phase 8, built LAST)
 
