@@ -75,6 +75,26 @@ async function goto( page, adminPath ) {
 }
 
 async function capture( page, file, alt, { fullPage = false } = {} ) {
+	if ( fullPage ) {
+		// Chromium's full-page screenshot stitches together several
+		// viewport-height captures while scrolling. Anything position:fixed
+		// stays pinned to the viewport during that scroll, so it can get
+		// captured again at each stitch point instead of only once at the
+		// true top — a well-known Playwright/Puppeteer full-page-screenshot
+		// artifact, not a WordPress or plugin bug. Two different fixed
+		// elements caused this here: WordPress's own #wpadminbar, and (the
+		// one that survived the first fix, traced by querying every
+		// computed-fixed/sticky element on the page) WooCommerce's own
+		// `.woocommerce-layout__header.is-scrolled.is-chrome-only` — a
+		// Chrome-specific sticky clone of its embedded page header that it
+		// shows once the page scrolls. Hiding both outright removes them
+		// from layout entirely, leaving nothing for the stitcher to
+		// duplicate. A brief settle wait lets the reflow finish before
+		// Playwright starts scrolling/capturing.
+		await page.addStyleTag( { content: '#wpadminbar, .woocommerce-layout__header.is-scrolled { display: none !important; }' } );
+		await page.waitForTimeout( 100 );
+	}
+
 	const raw = await page.screenshot( { fullPage } );
 	await sharp( raw ).resize( { width: OUTPUT_WIDTH } ).png( { quality: 90 } ).toFile( path.join( DOCS_DIR, file ) );
 	console.log( `  ✔ ${ file } — ${ alt }` );
