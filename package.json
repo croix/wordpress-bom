@@ -1,7 +1,7 @@
 {
     "name": "wc-bom-stock",
     "private": true,
-    "version": "1.0.0",
+    "version": "1.0.1",
     "scripts": {
         "start": "wp-scripts start",
         "build": "wp-scripts build",

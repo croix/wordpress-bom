@@ -6,7 +6,7 @@ Tested up to: 7.0
 Requires PHP: 8.1
 WC requires at least: 8.5
 WC tested up to: 10.9
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -48,10 +48,11 @@ A dismissible notice offers one-click install/activation for either if they aren
 == Installation ==
 
 1. WooCommerce must be installed and active.
-2. Upload the plugin files to `/wp-content/plugins/wc-bom-stock`, or install the zip through the Plugins screen.
-3. Activate the plugin.
-4. Go to **BOM & Stock** in the admin menu. If you'd like to explore with sample data first, run `wp wcbom seed` (WP-CLI) or use the "Install sample products" prompt on the Component Inventory screen when no components exist yet.
-5. Flag a product as a component (and set its unit) on its own edit screen, then attach a Bill of Materials to any product you want to build from components, on that product's "Bill of Materials" tab.
+2. Download the plugin zip from the **[Releases page](https://github.com/croix/wordpress-bom/releases/latest)** — the file named `wc-bom-stock-X.Y.Z.zip` under that release's Assets. **Do not use GitHub's green "Code" → "Download ZIP" button or a "Source code (zip)" link** — those download the raw, un-built source and are missing required files (the plugin will fail to activate, throwing a fatal error).
+3. Install that zip through the Plugins screen (Plugins → Add New → Upload Plugin), or upload its extracted contents to `/wp-content/plugins/wc-bom-stock`.
+4. Activate the plugin.
+5. Go to **BOM & Stock** in the admin menu. If you'd like to explore with sample data first, run `wp wcbom seed` (WP-CLI) or use the "Install sample products" prompt on the Component Inventory screen when no components exist yet.
+6. Flag a product as a component (and set its unit) on its own edit screen, then attach a Bill of Materials to any product you want to build from components, on that product's "Bill of Materials" tab.
 
 == Frequently Asked Questions ==
 
@@ -85,10 +86,17 @@ No. It's off by default, and while it's off there's no Purchasing menu item and 
 
 == Changelog ==
 
+= 1.0.1 =
+* If the plugin is ever installed from GitHub's raw "Download ZIP" source instead of the built release asset (which is missing required files and previously failed with a confusing fatal error), it now shows a clear explanatory notice instead.
+* Installation instructions below now link directly to the Releases page and warn against GitHub's green "Code" button.
+
 = 1.0.0 =
 * Initial public release: BOM editor, order consumption/restoration, buildable stock, Component Inventory screen, Manufacture Orders, nested BOMs (manufactured sub-assemblies usable as components in other recipes), reports, CSV import/export, REST API, WP-CLI commands, low-stock digest, BOM-derived weight/surcharges, HPOS compatibility, WooCommerce Cost of Goods Sold integration, optional vendors & purchase orders, and a full in-app documentation/training Guide with contextual help on every screen.
 
 == Upgrade Notice ==
+
+= 1.0.1 =
+No database changes; safe to update directly.
 
 = 1.0.0 =
 Initial public release.
