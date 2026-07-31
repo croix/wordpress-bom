@@ -25,21 +25,28 @@ final class ComponentInventory {
 		return new Section(
 			id: 'component-inventory',
 			title: __( 'Component Inventory', 'wcbom' ),
-			body: '<p>' . __( 'One screen lists every component with its current stock, which products it is used in, and when it last moved. Three actions cover every reason stock changes outside of a sale, each recorded on the ledger under its own reason so a history is always distinguishable:', 'wcbom' ) . '</p>'
-				. '<ul>'
-				. '<li>' . __( '<strong>Receive</strong> — stock arrived. Enter how much came in; it is added to what is already on hand. Select several components at once to receive a whole delivery in one pass.', 'wcbom' ) . '</li>'
-				. '<li>' . __( '<strong>Count</strong> — a physical cycle count. Enter the number actually counted; the system computes and shows the drift from what it expected, and records the counted number as the new stock.', 'wcbom' ) . '</li>'
-				. '<li>' . __( '<strong>Adjust</strong> — a manual correction (breakage, a miscount found later, anything else). Enter a signed change and a required note explaining why — this is the one action that can take stock negative, and the only one where a note is mandatory.', 'wcbom' ) . '</li>'
-				. '</ul>'
-				. '<p>' . __( 'When Vendors & Purchase Orders is turned on (see that section), an additional "On order" figure appears here per component — how much is on an open purchase order and when it is expected — so a low number does not automatically mean it is time to reorder again.', 'wcbom' ) . '</p>',
-			screenshots: array(
-				array(
-					'file' => 'inventory-table.png',
-					'alt'  => __( 'The Component Inventory table listing components with stock, usage, and last movement.', 'wcbom' ),
+			blocks: array(
+				Section::text(
+					'<p>' . __( 'One screen lists every component with its current stock, which products it is used in, and when it last moved.', 'wcbom' ) . '</p>'
 				),
-				array(
-					'file' => 'inventory-receive-modal.png',
-					'alt'  => __( 'The Receive stock modal with a quantity and note field.', 'wcbom' ),
+				Section::screenshot(
+					'inventory-table.png',
+					__( 'The Component Inventory table listing components with stock, usage, and last movement.', 'wcbom' )
+				),
+				Section::text(
+					'<p>' . __( 'Three actions cover every reason stock changes outside of a sale, each recorded on the ledger under its own reason so a history is always distinguishable:', 'wcbom' ) . '</p>'
+						. '<ul>'
+						. '<li>' . __( '<strong>Receive</strong> — stock arrived. Enter how much came in; it is added to what is already on hand. Select several components at once to receive a whole delivery in one pass.', 'wcbom' ) . '</li>'
+						. '<li>' . __( '<strong>Count</strong> — a physical cycle count. Enter the number actually counted; the system computes and shows the drift from what it expected, and records the counted number as the new stock.', 'wcbom' ) . '</li>'
+						. '<li>' . __( '<strong>Adjust</strong> — a manual correction (breakage, a miscount found later, anything else). Enter a signed change and a required note explaining why — this is the one action that can take stock negative, and the only one where a note is mandatory.', 'wcbom' ) . '</li>'
+						. '</ul>'
+				),
+				Section::screenshot(
+					'inventory-receive-modal.png',
+					__( 'The Receive stock modal with a quantity and note field.', 'wcbom' )
+				),
+				Section::text(
+					'<p>' . __( 'When Vendors & Purchase Orders is turned on (see that section), an additional "On order" figure appears here per component — how much is on an open purchase order and when it is expected — so a low number does not automatically mean it is time to reorder again.', 'wcbom' ) . '</p>'
 				),
 			),
 			links: array(

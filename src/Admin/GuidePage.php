@@ -112,17 +112,13 @@ final class GuidePage {
 	private function render_section( Section $section ): void {
 		echo '<section id="' . esc_attr( $section->id ) . '" class="wcbom-guide-section">';
 		echo '<h2>' . esc_html( $section->title ) . '</h2>';
-		echo wp_kses_post( $section->body );
 
-		foreach ( $section->screenshots as $shot ) {
-			$path = WCBOM_PLUGIN_DIR . '/assets/docs/' . $shot['file'];
-			if ( ! file_exists( $path ) ) {
-				continue;
+		foreach ( $section->blocks as $block ) {
+			if ( 'screenshot' === $block['type'] ) {
+				$this->render_screenshot( $block );
+			} else {
+				echo wp_kses_post( $block['html'] );
 			}
-
-			echo '<img class="wcbom-guide-screenshot" loading="lazy" src="'
-				. esc_url( plugins_url( 'assets/docs/' . $shot['file'], WCBOM_PLUGIN_FILE ) )
-				. '" alt="' . esc_attr( $shot['alt'] ) . '" />';
 		}
 
 		if ( ! empty( $section->video ) ) {
@@ -134,6 +130,24 @@ final class GuidePage {
 		$this->render_links( $section->links );
 
 		echo '</section>';
+	}
+
+	/**
+	 * Renders one screenshot block, skipped entirely (no broken <img>) if
+	 * the file is missing — e.g. before `npm run docs:screenshots` has
+	 * ever been run.
+	 *
+	 * @param array{type:'screenshot',file:string,alt:string} $block Screenshot block.
+	 */
+	private function render_screenshot( array $block ): void {
+		$path = WCBOM_PLUGIN_DIR . '/assets/docs/' . $block['file'];
+		if ( ! file_exists( $path ) ) {
+			return;
+		}
+
+		echo '<img class="wcbom-guide-screenshot" loading="lazy" src="'
+			. esc_url( plugins_url( 'assets/docs/' . $block['file'], WCBOM_PLUGIN_FILE ) )
+			. '" alt="' . esc_attr( $block['alt'] ) . '" />';
 	}
 
 	/**

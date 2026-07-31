@@ -411,10 +411,10 @@ the developer asked for a full documentation/training module built into the plug
 
 #### First, a correction on the third-party videos (verified in both plugins' source)
 
-Neither companion plugin actually embeds a video in its admin UI:
+**Corrected 2026-07-31** (during Phase 8 build, from a real screenshot of a live site): this section originally claimed Variation Swatches had no video anywhere in its admin UI. That was wrong — it does, on its own "Welcome" tab (`cfvsw_settings`), a real embedded-on-YouTube video the same way ThemeHigh's is linked. The original research checked the plugin's product-config screens and `readme.txt` but missed the Welcome tab specifically. Both plugins do link out to their own video, neither embeds it:
 
-- **ThemeHigh EPO** renders a floating "quick widget" popup containing outbound links — "Get support" (their wordpress.org forum) and **"Video Tutorial", a plain `target="_blank"` link to `youtube.com/watch?v=YoVPQhdwuis`** with a red YouTube icon. It's a link out, not an embed. (The icon is almost certainly what read as "embedded video" — an easy and reasonable misread.)
-- **Variation Swatches for WooCommerce** has a `[youtube ...]` shortcode in its **`readme.txt`**, which renders only on the wordpress.org plugin *directory* page. There is nothing video-related anywhere in its admin UI — so there is no "page in their app containing their video" to link to.
+- **ThemeHigh EPO** renders a floating "quick widget" popup containing outbound links — "Get support" (their wordpress.org forum) and **"Video Tutorial", a plain `target="_blank"` link to `youtube.com/watch?v=YoVPQhdwuis`** with a red YouTube icon. It's a link out, not an embed.
+- **Variation Swatches for WooCommerce** has its own "Welcome" tab (page slug `cfvsw_settings`) with a YouTube thumbnail linking to `youtube.com/watch?v=mjXCkw7rt2Y` ("Watch on YouTube") — also a link out, not an embed, once you actually click it. (It also separately has a `[youtube ...]` shortcode in its `readme.txt`, which renders only on the wordpress.org plugin *directory* page — a second, unrelated video pointer.)
 
 #### Decision: link to third-party videos, never embed them
 
