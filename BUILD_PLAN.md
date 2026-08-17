@@ -197,6 +197,9 @@ CREATE TABLE {prefix}wcbom_purchase_orders (
   reference     VARCHAR(191) NULL,          -- the vendor's own order/invoice number
   expected_date DATE NULL,
   notes         TEXT NULL,
+  freight_cost  DECIMAL(12,4) NULL,         -- landed-cost inputs (added 2026-07-31, Phase 9 addendum) — editable at any status, amortized display-only, see §5.13
+  tax_cost      DECIMAL(12,4) NULL,
+  fees_cost     DECIMAL(12,4) NULL,
   created_by    BIGINT UNSIGNED NOT NULL,
   created_at    DATETIME NOT NULL,
   ordered_at    DATETIME NULL,
@@ -213,6 +216,20 @@ CREATE TABLE {prefix}wcbom_po_items (
   qty_received  DECIMAL(12,4) NOT NULL DEFAULT 0,  -- cumulative across partial receipts
   unit_cost     DECIMAL(12,4) NULL,         -- per-unit price paid to the vendor (historical record only — see §5.13 on why this never writes product prices)
   KEY po (po_id), KEY component (component_id)
+);
+
+-- Order-item cost snapshot, frozen at time of sale (added 2026-08-16, Phase 11 §5.15)
+CREATE TABLE {prefix}wcbom_order_item_costs (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id      BIGINT UNSIGNED NOT NULL,
+  order_item_id BIGINT UNSIGNED NOT NULL,
+  product_id    BIGINT UNSIGNED NOT NULL,   -- the SOLD item's own ID (variation ID for a variation sale) — see §5.15
+  quantity      DECIMAL(12,4) NOT NULL,     -- units sold on this line at capture time
+  unit_cost     DECIMAL(12,4) NULL,         -- null = uncosted at capture time — never 0 (§5.15's "uncosted is never zero" rule)
+  cost_source   VARCHAR(32) NOT NULL,       -- bom_live | mo_snapshot | uncosted
+  captured_at   DATETIME NOT NULL,
+  UNIQUE KEY order_item (order_item_id),    -- one row per order item, ever — enforces the drift rule at the DB level, not just in application code
+  KEY order_ref (order_id)
 );
 ```
 
@@ -581,6 +598,51 @@ Verified against the actual code before writing this spec: `PhantomStock::comput
 
 **Estimate: ~1 day**, most of it tests proving the "already works" claims above plus the two save-time guards.
 
+### 5.15 Order-time cost snapshot & profitability reports (added 2026-08-16, Phase 11)
+
+The developer asked whether WooCommerce's native Cost of Goods Sold feature (§5.11) produces any reports of its own. It doesn't — confirmed against WooCommerce's own documentation: *"Currently, the COGS feature does not integrate with WooCommerce Analytics."* A handoff document from a sibling project (`pv-tax-reports`, an unrelated WooCommerce site/business that built this same kind of report first) was adapted into this spec — concept and formulas only; that plugin's class/table names and architecture have no bearing on this one.
+
+#### The one hard prerequisite: this plugin has no frozen sale-time cost today
+
+Verified against the actual code before writing this spec, not assumed. `Orders\OrderSync` already snapshots *quantities* consumed per order item (`_wcbom_consumed`, for restock-on-cancel purposes) — but never cost, and only for `MADE_TO_ORDER` products; a `MANUFACTURED` product's sale reduces its own real WooCommerce stock natively and never touches `OrderSync` at all. `Integrations\CogsProvider` (§5.11) computes cost live, but only when the merchant has both enabled WC's global COGS feature *and* opted the specific product in — most stores will have neither on, so most orders would have no cost record even if COGS were retrofitted to write one. **Building an unconditional, always-on cost-at-sale-time snapshot is therefore the real first step, not the reports themselves** — exactly what the handoff doc's own prerequisite section anticipated.
+
+#### New table: `wcbom_order_item_costs` (schema in §4)
+
+Written once, the first time `woocommerce_reduce_order_stock` fires for a given order item (the same hook `OrderSync` already uses, so capture timing exactly matches "pending → processing/completed, whichever comes first" — the handoff doc's own capture point), and **never updated afterward** — the drift rule, verbatim from the handoff: a later component-price change updates the cost of *future* sales, never restates a sale that already happened. Enforced by a `UNIQUE KEY` on `order_item_id`, not just an application-level idempotency check, so a retried/duplicate hook firing can never double-insert or silently overwrite a frozen row.
+
+`unit_cost` is `NULL` — never `0.00` — whenever no cost basis exists at capture time (a `STANDARD`-mode product this plugin was never asked to cost, or a `MADE_TO_ORDER`/`MANUFACTURED` product whose BOM has no priced components), with `cost_source = 'uncosted'` so a report can group/count these explicitly rather than inferring null-ness indirectly. `product_id` is the **sold item's own ID** — `$item->get_product()->get_id()`, the variation ID for a variation sale — never `WC_Order_Item_Product::get_product_id()` (always the parent). This plugin's own `ConditionMatcher`/`CogsProvider` already resolve BOMs this same way internally, so no new resolution convention is introduced — just reused correctly at the capture site (the handoff doc calls this out as an easy way to silently miss every variation sale, having gotten it right the first time in `pv-tax-reports` only after checking).
+
+**New `Orders\OrderCostSnapshot` class**, hooking `woocommerce_reduce_order_stock` independently of `OrderSync` — not folded into it, despite the shared hook, because the two have genuinely different scope (`OrderSync` only ever touches `MADE_TO_ORDER`; this needs to run for `MADE_TO_ORDER` *and* `MANUFACTURED`) and this plugin's established convention is one class per concern (`Reports\*Report`, `Bom\*`, `Purchasing\*`, etc.) rather than growing an existing class a second responsibility.
+
+**Cost source per product mode, matching `Integrations\CogsProvider`'s existing resolution exactly so the two can never disagree:**
+- **`MADE_TO_ORDER`** → `cost_source = 'bom_live'`. `Orders\OrderSync::consume_item()` already resolves the exact BOM lines this specific sale matched (`ConditionMatcher::resolve()`) for its own quantity snapshot — reuse that same resolved line list, run it through the existing `Reports\BomCost::for_lines()`, and capture the result. Zero new BOM-resolution logic; this is the same live-cost number `CogsProvider`/`MarginReport` would already show for this exact variation right now, just written down permanently instead of recomputed on every future read.
+- **`MANUFACTURED`** → `cost_source = 'mo_snapshot'`. Reuses `Integrations\CogsProvider`'s own latest-completed-MO-snapshot logic, captured **at the moment of this specific sale** (not recomputed later) — falls back to live BOM cost if the product had never been built yet at that point. This is a documented approximation, the same one `CogsProvider` already accepts: without per-unit lot/batch tracking (explicitly out of scope, §5.14), "what the units on the shelf cost to build most recently" is the best available proxy for "what the specific units this order drew from actually cost." Worth restating plainly in this feature's own docs/UI copy, not just here.
+- **`STANDARD`** → no row is written at all. This plugin has no BOM cost basis for a plain product and was never asked to invent one — `MarginReport`/`CogsProvider` already draw this same line; a standard sale simply isn't this plugin's data to report on (WooCommerce's own Analytics already covers it).
+
+#### Refunds: netted at report time, never by rewriting the frozen row
+
+Exactly the handoff doc's approach: `$order->get_qty_refunded_for_item()` / `get_total_refunded_for_item()`, both wrapped in `abs()` before arithmetic — WooCommerce's own documentation disagrees with itself on the sign convention these return, so `abs()`-then-subtract is correct regardless of which convention the installed version actually uses, without needing to verify it empirically. A fully-refunded line (net realized quantity ≤ 0) is excluded from a report entirely, never shown at $0. Cost reduces proportionally to the refunded quantity — the same "a refunded item's components are typically restockable" assumption `Orders\RefundHandler` already makes elsewhere in this plugin — stated as an assumption in the report's own copy, not asserted as universal fact.
+
+#### The core principle carried over unchanged: uncosted is never zero
+
+If a sold line has no frozen cost row (an uncosted product/BOM, or a sale that predates this feature shipping), its cost is left out of the cost sum entirely — never treated as $0, which would silently inflate profit and margin. A separate uncosted-quantity figure tracks how many units were left out. Whatever profit/margin figure a report shows is therefore a **ceiling** (revenue minus *known* cost) whenever uncosted quantity is nonzero, and the UI says so plainly next to the figure — the same discipline this plugin already applies to phantom stock and margin reporting elsewhere, not a new standard invented for this feature.
+
+#### The three views (`Reports\ProfitabilityReport`, a new class family alongside `MarginReport`/`BuildableReport`/etc.)
+
+1. **Product profitability** — group realized (post-refund-netting) lines by `product_id` over a date range: Product, Quantity, Revenue, Cost (known only), Uncosted quantity, Profit (Revenue − known Cost), Margin (Profit ÷ Revenue, blank when Revenue is 0).
+2. **Order profitability** — same math, grouped by order instead of product.
+3. **Trailing-12-month trend** — grouped by calendar month, independent of whatever date range views 1–2 are showing; a plain HTML table with a CSS-width bar per row for an at-a-glance trend, deliberately no JS charting library — matches this plugin's existing dependency-free reports (Component Usage, Low Stock). Lower priority than the two above, per the handoff doc's own framing — build it last within this phase if time is short.
+
+Split exactly as the handoff doc recommends, and as every existing report in this plugin already does: a **pure aggregation function** taking plain line-arrays (`product_id`/`order_id`/`quantity`/`revenue`/`cost`-or-`null`) and returning grouped totals — no WordPress or database calls, unit-tested directly and exhaustively (the uncosted-handling and refund-netting math is exactly the kind of thing that's easy to get subtly wrong and cheap to test in isolation once separated this way); a **WP-glue data source** iterating orders via `wc_get_orders()` (never raw `posts`/`wc_orders` queries — HPOS may store either) that joins in `wcbom_order_item_costs` and nets refunds, yielding plain arrays for the aggregation function — not unit-tested directly (needs a live WooCommerce, matching how every other report in this plugin already draws this same line).
+
+**One admin surface, not three** — a new "Profitability" tab on the existing Reports screen (alongside Buildable/Low Stock/Margin/Usage/Ledger), one date-range filter, all three views, CSV export matching the Ledger tab's existing pattern. **No feature-gate/setting**: unlike Vendors & POs (§5.13), this is read-only reporting adding no new REST routes/menu items whose absence anyone explicitly asked for — consistent with how every other report tab in this plugin already works, always on.
+
+#### What's deliberately not built, carried over from the handoff doc's own scope call
+
+Customer report (general sales/CRM analytics — WooCommerce's own Analytics already covers it), bulk cost/price/markup editing (a pricing/merchandising feature this plugin has deliberately never touched — it only ever manages *cost*, never *price*), VAT-inclusive/exclusive pricing (wrong tax system for this plugin's market), XLSX export (CSV already opens fine in the tools that matter; not worth a new dependency for the marginal gain). If asked to go further than the three views above, that's the point to stop and ask, rather than assume "more like a paid extension" is automatically wanted — the handoff doc's own explicit instruction, kept here verbatim since it's still the right call.
+
+**Estimate: ~2–3 days.** The cost-snapshot mechanism is small (one table, one new class reusing existing resolution logic wholesale); the three reports are the bulk of the work, but follow a pattern (`Reports\*Report` + `Rest\ReportsApi` + a Reports-screen React tab) this plugin has already built five times.
+
 ## 6. Suggested features you didn't mention (recommend building)
 
 1. **Stock ledger / audit trail** (§2.5) — without it, "why is my blank count wrong?" is unanswerable. *Build in phase 1.*
@@ -687,7 +749,11 @@ All admin AJAX/REST behind `manage_woocommerce` capability + nonces. MO complete
 - Per §5.14: cycle detection + made-to-order-component rejection in `BomRepository::save()`; tests proving consumption/invalidation/buildable behavior for manufactured components already works end-to-end; docs notes on shallow-buildable semantics and sub-assembly pricing.
 - ✅ Demo (verified): built a manufactured sub-assembly and used it as a made-to-order product's only always-line — buildable = floor(sub-assembly on-hand ÷ qty), refreshing correctly as the sub-assembly was built/reversed/consumed, while a raw material used only inside the sub-assembly's own recipe correctly did not move it; a self-referencing save, an indirect A→B→A cycle, and a made-to-order component were all rejected with clear messages through the real BOM editor UI, not just direct code calls.
 
-**Total estimate: ~13–18 focused build days** (plus ~half a day for Phase 7, ~2–3 days for Phase 9, ~1 day for Phase 10, and ~3–4 days for Phase 8, which ships last). Phases 1–4 are the core; 5–6 can trail while the store starts using it.
+### Phase 11 — Order-time cost snapshot & profitability reports (~2–3 days, added 2026-08-16)
+- Per §5.15: new `wcbom_order_item_costs` table + `Orders\OrderCostSnapshot` (hooks `woocommerce_reduce_order_stock` independently of `OrderSync`, freezes cost once per order item, never rewrites it); `Reports\ProfitabilityReport` family (product/order/trailing-12-month views) as a pure aggregation function plus a WP-glue data source, matching this plugin's existing report architecture; a new "Profitability" tab on the Reports screen, no feature gate.
+- ✅ Demo: place a made-to-order sale, confirm a `bom_live`-sourced row is captured matching that moment's live BOM cost; complete a manufacture order and sell one of the finished units, confirm a `mo_snapshot`-sourced row; change a component's price afterward and re-run the report — the original sale's cost and profit are unchanged (the drift rule); partially refund a line and confirm both revenue and cost net down proportionally; a product with no cost basis shows in the report with its quantity counted as uncosted and profit flagged as a ceiling, never priced at $0.
+
+**Total estimate: ~13–18 focused build days** (plus ~half a day for Phase 7, ~2–3 days for Phase 9, ~1 day for Phase 10, ~3–4 days for Phase 8 which ships last, and ~2–3 days for Phase 11). Phases 1–4 are the core; 5–6 can trail while the store starts using it.
 
 ---
 
@@ -732,6 +798,15 @@ Phase 9 addendum (freight/tax/fees + close relabeling, added 2026-07-31) adds:
 29. Freight/tax/fees are editable via `update_costs()` regardless of PO status — draft, ordered, or fully received — and `null` clears a previously-set field rather than zeroing it.
 30. Landed cost amortizes proportional to each line's ordered value; a line with no unit_cost gets zero allocation and a null landed_unit_cost, while the PO's total-fees figure still reflects the true total. Zero fees means every line's landed cost equals its plain unit cost.
 31. Sending a PO with both recipients selected and both emails on file sends two distinct emails (one per recipient) and reports both addresses back; a vendor with no email on file produces a warning rather than a failure when "to myself" is still selected and resolvable. Selecting neither recipient, or having no selected recipient resolve to a usable email at all, throws rather than silently no-oping.
+
+Phase 11 (order-time cost snapshot & profitability reports, §5.15) adds:
+
+32. A made-to-order sale writes exactly one `wcbom_order_item_costs` row per order item, `cost_source = 'bom_live'`, matching `Reports\BomCost::for_lines()` over the exact same resolved lines `OrderSync` used for its own quantity snapshot at that moment; a manufactured-product sale writes `cost_source = 'mo_snapshot'` matching the latest completed MO's snapshot cost at that moment (falling back to live BOM cost if never built); a standard-product sale writes no row at all.
+33. The captured row never changes after a later component-price or MO change — re-running a profitability report after prices change still shows the original sale's original cost and profit (the drift rule), enforced by a `UNIQUE KEY` on `order_item_id` that a duplicate/retried capture can't violate silently.
+34. A partially refunded line nets both quantity and revenue proportionally using `abs()`'d `get_qty_refunded_for_item()`/`get_total_refunded_for_item()`, with cost reduced by the same proportion; a fully refunded line is excluded from the report entirely, never shown at $0.
+35. A sale with no cost basis is never counted as $0 cost: excluded from the cost sum, counted in a separate uncosted-quantity figure, with the resulting profit/margin presented as a ceiling rather than an exact number whenever uncosted quantity is nonzero.
+36. Product profitability groups by the sold item's own ID (the variation ID for a variation sale), not the parent product ID `WC_Order_Item_Product::get_product_id()` would return.
+37. The trailing-12-month trend view is independent of whatever date range the product/order views are currently showing, and always covers the last 12 calendar months including the current one.
 
 ---
 

@@ -144,6 +144,7 @@ The next `phpunit` run recreates all tables (`WC_Install::install()` + `Schema::
 - [x] Phase 10: nested BOMs / sub-assemblies — **done and verified 2026-07-31, see Progress Log**
 - [x] Phase 8: in-app documentation & training module — **done and verified 2026-07-31, see Progress Log**. This was deliberately the last phase built (the developer's ordering rule), and with it done, all currently-spec'd phases are complete.
 - [x] Post-launch rebrand: renamed to "PoorVida BOM & Stock Manager" / slug `pv-bom-stock` (was "WooCommerce BOM & Stock Manager" / `wc-bom-stock`) — **done and verified 2026-07-31, see Progress Log**. Shipped as a breaking v2.0.0.
+- [ ] Phase 11: order-time cost snapshot & profitability reports — **spec'd 2026-08-16 (BUILD_PLAN §5.15), not yet built** (~2–3 days). Adapted from a handoff doc written by a session on the separate `pv-tax-reports` plugin; this plugin's own prerequisite gap (no frozen sale-time cost anywhere yet) was confirmed against the actual code, not assumed, before speccing.
 
 All currently-spec'd phases are now complete. Update this checklist if new scope is added. Remaining open decisions are in BUILD_PLAN.md §11.
 
@@ -152,6 +153,18 @@ All currently-spec'd phases are now complete. Update this checklist if new scope
 ## Progress Log
 
 Append a dated entry each session (newest on top). Don't rewrite history — if a decision changes, add a new entry noting the change, and update BUILD_PLAN.md §10/§11 if it's a scope-level decision.
+
+### 2026-08-16 — Phase 11 spec'd: order-time cost snapshot & profitability reports
+
+Picked back up after a gap (this repo's history had been rewritten — author-identity fix plus de-personalizing a few code comments ahead of the eventual public release — and substantially extended elsewhere in the meantime: Phase 10, Phase 8, and the v2.0.0 rebrand above all landed before this session started). Local clone was stale (diverged 42/53 commits from origin); reset to `origin/main`, dependencies reinstalled, dev environment rebuilt and reactivated under the new `pv-bom-stock` slug, full suite reconfirmed clean (56/56 tests, PHPCS clean aside from the two pre-existing unshipped dev-fixture scripts, PHPStan clean) before doing anything new.
+
+The developer brought a handoff document (`~/projects/pv-tax-reports/docs/PROFITABILITY-REPORTS-HANDOFF.md`) written by a session on a completely separate WooCommerce plugin/site (`pv-tax-reports` — different business, different architecture) that had built the same kind of profitability reporting first. The doc is explicitly a concept/formula spec, not code to port.
+
+**Confirmed the doc's own stated prerequisite is a real gap here, rather than assuming either way:** read `Orders\OrderSync` directly — it snapshots consumed *quantities* per order item (`_wcbom_consumed`) but never cost, and only for `MADE_TO_ORDER` products; `MANUFACTURED` sales never touch it at all (their stock reduces natively). `Integrations\CogsProvider` (§5.11) computes cost live but only when both WC's global COGS feature and the product's own opt-in toggle are on — neither is true by default, so most orders would have no cost record today even if COGS were retrofitted to write one. This plugin genuinely has no frozen-cost-at-sale-time mechanism yet.
+
+**Spec'd as BUILD_PLAN §5.15 / Phase 11** — a new `wcbom_order_item_costs` table (one row per order item, written once via a new `Orders\OrderCostSnapshot` class hooking the same `woocommerce_reduce_order_stock` event `OrderSync` already uses, `UNIQUE KEY` on `order_item_id` enforcing the drift rule at the DB level) plus a `Reports\ProfitabilityReport` family (product/order/trailing-12-month views) as a new Reports-screen tab, no feature gate. Cost source is deliberately made to match `CogsProvider`'s existing resolution exactly rather than invent a second way to compute the same thing: `bom_live` for made-to-order (reusing the exact BOM lines `OrderSync` already resolves for its own snapshot, through the existing shared `Reports\BomCost`), `mo_snapshot` for manufactured (reusing `CogsProvider`'s own latest-completed-MO lookup, captured at that moment rather than recomputed later — a documented approximation given this plugin has no per-unit lot tracking), and no row at all for standard products (this plugin was never asked to cost those, and `MarginReport`/`CogsProvider` already draw that same line). "Uncosted is never zero" and refund-netting-via-`abs()`'d-WC-accessors carried over verbatim from the handoff doc, since both are already this plugin's own existing conventions in other reports/refund handling. Full acceptance criteria (scenarios 32–37) and schema added to §4/§9; also fixed a small pre-existing doc gap while in there — §4's `wcbom_purchase_orders` reference table never had the Phase 9 addendum's freight/tax/fees columns added to it, even though the code and §5.13's prose both already had them.
+
+Nothing built yet — spec only. Next: build per §5.15, starting with the cost-snapshot mechanism (small, self-contained, reuses existing resolution logic) before the three reports (the bulk of the work, but following a pattern — `Reports\*Report` + `Rest\ReportsApi` + a Reports-screen tab — this plugin has already built five times).
 
 ### 2026-07-31 — Full rebrand: "PoorVida BOM & Stock Manager" / slug `pv-bom-stock`, shipped as v2.0.0
 
