@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace WCBOM\Admin;
 
 use WCBOM\Bom\BomCsv;
+use WCBOM\Reports\ProfitabilityReport;
 use WCBOM\Stock\Ledger;
 
 defined( 'ABSPATH' ) || exit;
@@ -32,12 +33,14 @@ final class ImportExportHandlers {
 	/**
 	 * Constructs the handlers.
 	 *
-	 * @param BomCsv $bom_csv BOM CSV import/export.
-	 * @param Ledger $ledger  Ledger query, for CSV export.
+	 * @param BomCsv              $bom_csv       BOM CSV import/export.
+	 * @param Ledger              $ledger        Ledger query, for CSV export.
+	 * @param ProfitabilityReport $profitability Profitability reports, for CSV export.
 	 */
 	public function __construct(
 		private readonly BomCsv $bom_csv,
-		private readonly Ledger $ledger
+		private readonly Ledger $ledger,
+		private readonly ProfitabilityReport $profitability
 	) {}
 
 	/**
@@ -47,6 +50,7 @@ final class ImportExportHandlers {
 		add_action( 'admin_post_wcbom_export_boms', array( $this, 'export_boms' ) );
 		add_action( 'admin_post_wcbom_import_boms', array( $this, 'import_boms' ) );
 		add_action( 'admin_post_wcbom_export_ledger', array( $this, 'export_ledger' ) );
+		add_action( 'admin_post_wcbom_export_profitability', array( $this, 'export_profitability' ) );
 		add_action( 'admin_notices', array( $this, 'render_deferred_notice' ) );
 	}
 
@@ -169,6 +173,69 @@ final class ImportExportHandlers {
 		fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- closes the in-memory stream opened above.
 
 		$this->stream_csv( false !== $csv ? $csv : '', 'wcbom-ledger-' . gmdate( 'Y-m-d' ) . '.csv' );
+	}
+
+	/**
+	 * Downloads one profitability view as CSV, honoring whichever view/date
+	 * range the Reports screen's Profitability tab is currently showing.
+	 */
+	public function export_profitability(): void {
+		$this->guard();
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- verified via check_admin_referer() in guard() above.
+		$view = isset( $_GET['view'] ) ? sanitize_key( wp_unslash( (string) $_GET['view'] ) ) : 'product';
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$date_from = isset( $_GET['date_from'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['date_from'] ) ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$date_to = isset( $_GET['date_to'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['date_to'] ) ) : '';
+
+		if ( '' === $date_to ) {
+			$date_to = current_time( 'Y-m-d' );
+		}
+		if ( '' === $date_from ) {
+			$date_from = gmdate( 'Y-m-d', strtotime( current_time( 'mysql' ) . ' -30 days' ) );
+		}
+
+		switch ( $view ) {
+			case 'order':
+				$rows      = $this->profitability->order_rows( $date_from, $date_to );
+				$key_field = 'order_id';
+				break;
+			case 'trend':
+				$rows      = $this->profitability->trend_rows();
+				$key_field = 'month';
+				break;
+			default:
+				$rows      = $this->profitability->product_rows( $date_from, $date_to );
+				$key_field = 'product_id';
+				break;
+		}
+
+		$fh = fopen( 'php://temp', 'r+' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- an in-memory stream, not real filesystem access.
+		fputcsv( $fh, array( $key_field, 'quantity', 'revenue', 'cost', 'uncosted_quantity', 'profit', 'margin' ) );
+
+		foreach ( $rows as $row ) {
+			$label = 'product_id' === $key_field ? $row['product_name'] : $row[ $key_field ];
+
+			fputcsv(
+				$fh,
+				array(
+					$label,
+					$row['quantity'],
+					$row['revenue'],
+					$row['cost'],
+					$row['uncosted_quantity'],
+					$row['profit'],
+					$row['margin'] ?? '',
+				)
+			);
+		}
+
+		rewind( $fh );
+		$csv = stream_get_contents( $fh );
+		fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- closes the in-memory stream opened above.
+
+		$this->stream_csv( false !== $csv ? $csv : '', 'wcbom-profitability-' . $view . '-' . gmdate( 'Y-m-d' ) . '.csv' );
 	}
 
 	/**

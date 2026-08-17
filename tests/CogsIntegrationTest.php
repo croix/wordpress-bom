@@ -14,6 +14,7 @@ use WCBOM\Bom\ConditionMatcher;
 use WCBOM\Integrations\CogsProvider;
 use WCBOM\Manufacture\ManufactureRepository;
 use WCBOM\Reports\BomCost;
+use WCBOM\Reports\ManufacturedCost;
 use WCBOM\Reports\MarginReport;
 
 final class CogsIntegrationTest extends WCBOM_UnitTestCase {
@@ -189,7 +190,7 @@ final class CogsIntegrationTest extends WCBOM_UnitTestCase {
 			new BomRepository(),
 			new ConditionMatcher(),
 			new BomCost(),
-			new ManufactureRepository()
+			new ManufacturedCost( new ManufactureRepository() )
 		);
 	}
 

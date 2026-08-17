@@ -230,6 +230,156 @@ function UsageTab( { restNamespace } ) {
 	);
 }
 
+function defaultDateFrom() {
+	const d = new Date();
+	d.setDate( d.getDate() - 30 );
+	return d.toISOString().slice( 0, 10 );
+}
+
+function defaultDateTo() {
+	return new Date().toISOString().slice( 0, 10 );
+}
+
+function ProfitabilityTab( { restNamespace, profitabilityExportUrl } ) {
+	const [ view, setView ] = useState( 'product' );
+	const [ dateFrom, setDateFrom ] = useState( defaultDateFrom() );
+	const [ dateTo, setDateTo ] = useState( defaultDateTo() );
+	const [ rows, setRows ] = useState( [] );
+	const [ loading, setLoading ] = useState( true );
+	const [ error, setError ] = useState( null );
+
+	useEffect( () => {
+		setLoading( true );
+		setError( null );
+
+		const path =
+			'trend' === view
+				? `/${ restNamespace }/reports/profitability/trend`
+				: addQueryArgs( `/${ restNamespace }/reports/profitability/${ view }`, {
+						date_from: dateFrom,
+						date_to: dateTo,
+				  } );
+
+		apiFetch( { path } )
+			.then( ( response ) => setRows( response.rows ) )
+			.catch( ( err ) => setError( err.message || String( err ) ) )
+			.finally( () => setLoading( false ) );
+	}, [ restNamespace, view, dateFrom, dateTo ] );
+
+	const keyField = 'order' === view ? 'order_id' : 'trend' === view ? 'month' : 'product_id';
+
+	const labelFor = ( row ) => {
+		if ( 'order' === view ) {
+			return `#${ row.order_id }`;
+		}
+		if ( 'trend' === view ) {
+			return row.month;
+		}
+		return row.product_name || `#${ row.product_id }`;
+	};
+
+	const exportHref = addQueryArgs( profitabilityExportUrl, {
+		view,
+		date_from: dateFrom,
+		date_to: dateTo,
+	} );
+
+	const hasUncosted = rows.some( ( row ) => row.uncosted_quantity > 0 );
+
+	return (
+		<>
+			<div style={ { display: 'flex', gap: '1em', alignItems: 'flex-end', marginBottom: '1em', flexWrap: 'wrap' } }>
+				<SelectControl
+					label={ __( 'View', 'pv-bom-stock' ) }
+					value={ view }
+					options={ [
+						{ label: __( 'Product', 'pv-bom-stock' ), value: 'product' },
+						{ label: __( 'Order', 'pv-bom-stock' ), value: 'order' },
+						{ label: __( 'Trend (12 months)', 'pv-bom-stock' ), value: 'trend' },
+					] }
+					onChange={ setView }
+					__next40pxDefaultSize
+					__nextHasNoMarginBottom
+				/>
+				{ 'trend' !== view && (
+					<>
+						<TextControl
+							type="date"
+							label={ __( 'From', 'pv-bom-stock' ) }
+							value={ dateFrom }
+							onChange={ setDateFrom }
+							__next40pxDefaultSize
+							__nextHasNoMarginBottom
+						/>
+						<TextControl
+							type="date"
+							label={ __( 'To', 'pv-bom-stock' ) }
+							value={ dateTo }
+							onChange={ setDateTo }
+							__next40pxDefaultSize
+							__nextHasNoMarginBottom
+						/>
+					</>
+				) }
+				<a className="button" href={ exportHref }>
+					{ __( 'Export CSV', 'pv-bom-stock' ) }
+				</a>
+			</div>
+
+			{ loading && <Spinner /> }
+			{ error && (
+				<Notice status="error" isDismissible={ false }>
+					{ error }
+				</Notice>
+			) }
+
+			{ ! loading && ! error && 0 === rows.length && (
+				<p>{ __( 'No realized sales in this range yet.', 'pv-bom-stock' ) }</p>
+			) }
+
+			{ ! loading && ! error && rows.length > 0 && (
+				<>
+					{ hasUncosted && (
+						<Notice status="warning" isDismissible={ false }>
+							{ __( 'Some sales have no cost on file. Their margin below is a ceiling, not an exact figure — see the "uncosted" quantity per row.', 'pv-bom-stock' ) }
+						</Notice>
+					) }
+					<table className="widefat striped">
+						<thead>
+							<tr>
+								<th>{ 'order' === view ? __( 'Order', 'pv-bom-stock' ) : 'trend' === view ? __( 'Month', 'pv-bom-stock' ) : __( 'Product', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Qty', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Revenue', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Cost', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Uncosted qty', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Profit', 'pv-bom-stock' ) }</th>
+								<th>{ __( 'Margin', 'pv-bom-stock' ) }</th>
+							</tr>
+						</thead>
+						<tbody>
+							{ rows.map( ( row ) => (
+								<tr key={ row[ keyField ] }>
+									<td>{ labelFor( row ) }</td>
+									<td>{ formatNumber( row.quantity ) }</td>
+									<td>{ formatMoney( row.revenue ) }</td>
+									<td>{ formatMoney( row.cost ) }</td>
+									<td>{ row.uncosted_quantity > 0 ? formatNumber( row.uncosted_quantity ) : '—' }</td>
+									<td>{ formatMoney( row.profit ) }</td>
+									<td>
+										{ null === row.margin
+											? '—'
+											: `${ row.uncosted_quantity > 0 ? '≤' : '' }${ row.margin }%` }
+									</td>
+								</tr>
+							) ) }
+						</tbody>
+					</table>
+				</>
+			) }
+		</>
+	);
+}
+
 function LedgerTab( { restNamespace, ledgerExportUrl } ) {
 	const [ rows, setRows ] = useState( [] );
 	const [ total, setTotal ] = useState( 0 );
@@ -348,7 +498,7 @@ function LedgerTab( { restNamespace, ledgerExportUrl } ) {
 	);
 }
 
-function ReportsApp( { restNamespace, ledgerExportUrl } ) {
+function ReportsApp( { restNamespace, ledgerExportUrl, profitabilityExportUrl } ) {
 	return (
 		<Card>
 			<CardBody>
@@ -358,6 +508,7 @@ function ReportsApp( { restNamespace, ledgerExportUrl } ) {
 						{ name: 'low-stock', title: __( 'Low Stock', 'pv-bom-stock' ) },
 						{ name: 'margin', title: __( 'Margin', 'pv-bom-stock' ) },
 						{ name: 'usage', title: __( 'Component Usage', 'pv-bom-stock' ) },
+						{ name: 'profitability', title: __( 'Profitability', 'pv-bom-stock' ) },
 						{ name: 'ledger', title: __( 'Ledger', 'pv-bom-stock' ) },
 					] }
 				>
@@ -369,6 +520,13 @@ function ReportsApp( { restNamespace, ledgerExportUrl } ) {
 								return <MarginTab restNamespace={ restNamespace } />;
 							case 'usage':
 								return <UsageTab restNamespace={ restNamespace } />;
+							case 'profitability':
+								return (
+									<ProfitabilityTab
+										restNamespace={ restNamespace }
+										profitabilityExportUrl={ profitabilityExportUrl }
+									/>
+								);
 							case 'ledger':
 								return <LedgerTab restNamespace={ restNamespace } ledgerExportUrl={ ledgerExportUrl } />;
 							default:
@@ -383,8 +541,12 @@ function ReportsApp( { restNamespace, ledgerExportUrl } ) {
 
 const root = document.getElementById( 'wcbom-reports-root' );
 if ( root && window.wcbomReports ) {
-	const { restNamespace, ledgerExportUrl } = window.wcbomReports;
+	const { restNamespace, ledgerExportUrl, profitabilityExportUrl } = window.wcbomReports;
 	createRoot( root ).render(
-		<ReportsApp restNamespace={ restNamespace } ledgerExportUrl={ ledgerExportUrl } />
+		<ReportsApp
+			restNamespace={ restNamespace }
+			ledgerExportUrl={ ledgerExportUrl }
+			profitabilityExportUrl={ profitabilityExportUrl }
+		/>
 	);
 }

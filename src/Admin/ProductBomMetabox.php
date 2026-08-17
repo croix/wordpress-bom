@@ -14,8 +14,8 @@ use WCBOM\Bom\Bom;
 use WCBOM\Bom\BomRepository;
 use WCBOM\Bom\ConditionMatcher;
 use WCBOM\Bom\ProductMode;
-use WCBOM\Manufacture\ManufactureRepository;
 use WCBOM\Reports\BomCost;
+use WCBOM\Reports\ManufacturedCost;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -29,16 +29,16 @@ final class ProductBomMetabox {
 	/**
 	 * Constructs the metabox.
 	 *
-	 * @param BomRepository         $boms      Used for the "used in N products" reverse view.
-	 * @param ConditionMatcher      $matcher   Resolves always-lines for the COGS cost hint.
-	 * @param BomCost               $cost      Shared Σ(component price × qty) calculation.
-	 * @param ManufactureRepository $mo_orders Latest completed MO lookup, for the MANUFACTURED cost hint.
+	 * @param BomRepository    $boms              Used for the "used in N products" reverse view.
+	 * @param ConditionMatcher $matcher           Resolves always-lines for the COGS cost hint.
+	 * @param BomCost          $cost              Shared Σ(component price × qty) calculation.
+	 * @param ManufacturedCost $manufactured_cost Shared MANUFACTURED build-snapshot cost calculation, for the COGS cost hint.
 	 */
 	public function __construct(
 		private readonly BomRepository $boms,
 		private readonly ConditionMatcher $matcher,
 		private readonly BomCost $cost,
-		private readonly ManufactureRepository $mo_orders
+		private readonly ManufacturedCost $manufactured_cost
 	) {}
 
 	/**
@@ -232,16 +232,9 @@ final class ProductBomMetabox {
 	 */
 	private function cogs_hint_cost( int $product_id, Bom $bom ): float {
 		if ( ProductMode::MANUFACTURED === ProductMode::resolve( $product_id ) ) {
-			$mo = $this->mo_orders->latest_completed_for_product( $product_id );
-			if ( null !== $mo ) {
-				$cost = 0.0;
-				foreach ( $mo->items as $item ) {
-					if ( null !== $item->unit_cost ) {
-						$cost += $item->qty_per_unit * $item->unit_cost;
-					}
-				}
-
-				return $cost;
+			$snapshot_cost = $this->manufactured_cost->for_product( $product_id );
+			if ( null !== $snapshot_cost ) {
+				return $snapshot_cost;
 			}
 		}
 

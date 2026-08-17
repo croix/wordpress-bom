@@ -18,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Schema {
 
-	public const DB_VERSION = '0.6.0';
+	public const DB_VERSION = '0.7.0';
 
 	private const OPTION_KEY = 'wcbom_db_version';
 
@@ -171,6 +171,20 @@ CREATE TABLE {$prefix}wcbom_po_items (
   PRIMARY KEY  (poi_id),
   KEY po (po_id),
   KEY component (component_id)
+) {$charset_collate};
+
+CREATE TABLE {$prefix}wcbom_order_item_costs (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  order_id BIGINT UNSIGNED NOT NULL,
+  order_item_id BIGINT UNSIGNED NOT NULL,
+  product_id BIGINT UNSIGNED NOT NULL,
+  quantity DECIMAL(12,4) NOT NULL,
+  unit_cost DECIMAL(12,4) NULL,
+  cost_source VARCHAR(32) NOT NULL,
+  captured_at DATETIME NOT NULL,
+  PRIMARY KEY  (id),
+  UNIQUE KEY order_item (order_item_id),
+  KEY order_ref (order_id)
 ) {$charset_collate};
 ";
 

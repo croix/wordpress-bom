@@ -135,8 +135,9 @@ final class ReportsPage {
 			'wcbom-reports',
 			'wcbomReports',
 			array(
-				'restNamespace'   => 'wcbom/v1',
-				'ledgerExportUrl' => wp_nonce_url( admin_url( 'admin-post.php?action=wcbom_export_ledger' ), IE::NONCE_ACTION ),
+				'restNamespace'          => 'wcbom/v1',
+				'ledgerExportUrl'        => wp_nonce_url( admin_url( 'admin-post.php?action=wcbom_export_ledger' ), IE::NONCE_ACTION ),
+				'profitabilityExportUrl' => wp_nonce_url( admin_url( 'admin-post.php?action=wcbom_export_profitability' ), IE::NONCE_ACTION ),
 			)
 		);
 	}

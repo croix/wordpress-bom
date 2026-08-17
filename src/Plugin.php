@@ -33,6 +33,8 @@ use WCBOM\Integrations\ThemeHighEpo;
 use WCBOM\Manufacture\ManufactureRepository;
 use WCBOM\Manufacture\ManufactureService;
 use WCBOM\Manufacture\ProductFactory;
+use WCBOM\Orders\OrderCostSnapshot;
+use WCBOM\Orders\OrderItemCostRepository;
 use WCBOM\Orders\OrderSync;
 use WCBOM\Orders\RefundHandler;
 use WCBOM\Purchasing\LandedCost;
@@ -45,7 +47,10 @@ use WCBOM\Reports\BuildableReport;
 use WCBOM\Reports\ComponentUsageReport;
 use WCBOM\Reports\LowStockDigest;
 use WCBOM\Reports\LowStockReport;
+use WCBOM\Reports\ManufacturedCost;
 use WCBOM\Reports\MarginReport;
+use WCBOM\Reports\ProfitabilityAggregator;
+use WCBOM\Reports\ProfitabilityReport;
 use WCBOM\Rest\Api;
 use WCBOM\Rest\InventoryApi;
 use WCBOM\Rest\LedgerApi;
@@ -113,19 +118,24 @@ final class Plugin {
 		$landed_cost = new LandedCost();
 		$po_mailer   = new PurchaseOrderMailer( $vendors );
 
-		$buildable_report = new BuildableReport( $boms );
-		$usage_report     = new ComponentUsageReport( $boms, $ledger );
-		$low_stock_report = new LowStockReport( $boms, $po_orders );
-		$bom_cost         = new BomCost();
-		$margin_report    = new MarginReport( $boms, $matcher, $bom_cost );
-		$bom_csv          = new BomCsv( $boms );
+		$buildable_report  = new BuildableReport( $boms );
+		$usage_report      = new ComponentUsageReport( $boms, $ledger );
+		$low_stock_report  = new LowStockReport( $boms, $po_orders );
+		$bom_cost          = new BomCost();
+		$manufactured_cost = new ManufacturedCost( $mo_orders );
+		$margin_report     = new MarginReport( $boms, $matcher, $bom_cost );
+		$bom_csv           = new BomCsv( $boms );
 
-		( new ProductBomMetabox( $boms, $matcher, $bom_cost, $mo_orders ) )->register();
+		$order_item_costs     = new OrderItemCostRepository();
+		$profitability_report = new ProfitabilityReport( $order_item_costs, new ProfitabilityAggregator() );
+
+		( new ProductBomMetabox( $boms, $matcher, $bom_cost, $manufactured_cost ) )->register();
 		( new DeletionGuard( $boms ) )->register();
 		( new OrderSync( $stock, $boms, $matcher ) )->register();
 		( new RefundHandler( $stock ) )->register();
+		( new OrderCostSnapshot( $boms, $matcher, $bom_cost, $manufactured_cost, $order_item_costs ) )->register();
 		( new ThemeHighEpo() )->register();
-		( new CogsProvider( $boms, $matcher, $bom_cost, $mo_orders ) )->register();
+		( new CogsProvider( $boms, $matcher, $bom_cost, $manufactured_cost ) )->register();
 		$phantom->register();
 		( new StorefrontStock( $phantom, $boms, $matcher ) )->register();
 		( new CartPricing( $boms, $matcher ) )->register();
@@ -136,7 +146,7 @@ final class Plugin {
 		( new ReportsPage() )->register();
 		( new EndpointsPage() )->register();
 		( new GuidePage() )->register();
-		( new ImportExportHandlers( $bom_csv, $ledger ) )->register();
+		( new ImportExportHandlers( $bom_csv, $ledger, $profitability_report ) )->register();
 		( new LowStockDigest( $low_stock_report ) )->register();
 		( new SettingsPage() )->register();
 		( new GitHubUpdater() )->register();
@@ -144,13 +154,13 @@ final class Plugin {
 
 		add_action(
 			'rest_api_init',
-			static function () use ( $boms, $stock, $guard, $mo_orders, $mo_service, $vendors, $po_orders, $po_service, $landed_cost, $po_mailer, $ledger, $buildable_report, $usage_report, $low_stock_report, $margin_report ) {
+			static function () use ( $boms, $stock, $guard, $mo_orders, $mo_service, $vendors, $po_orders, $po_service, $landed_cost, $po_mailer, $ledger, $buildable_report, $usage_report, $low_stock_report, $margin_report, $profitability_report ) {
 				( new Api( $boms ) )->register_routes();
 				( new InventoryApi( $stock, $boms, $guard, $po_orders ) )->register_routes();
 				( new SampleDataApi( new SampleData() ) )->register_routes();
 				( new ManufactureApi( $mo_service, $mo_orders, $boms ) )->register_routes();
 				( new PurchasingApi( $po_service, $po_orders, $vendors, $landed_cost, $po_mailer ) )->register_routes();
-				( new ReportsApi( $buildable_report, $usage_report, $low_stock_report, $margin_report ) )->register_routes();
+				( new ReportsApi( $buildable_report, $usage_report, $low_stock_report, $margin_report, $profitability_report ) )->register_routes();
 				( new LedgerApi( $ledger ) )->register_routes();
 			}
 		);

@@ -29,6 +29,7 @@ function wcbom_run_uninstall(): void {
 			'wcbom_po_items',
 			'wcbom_purchase_orders',
 			'wcbom_vendors',
+			'wcbom_order_item_costs',
 		) as $wcbom_table
 	) {
 		$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}{$wcbom_table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared

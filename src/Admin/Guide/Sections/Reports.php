@@ -26,7 +26,7 @@ final class Reports {
 			id: 'reports',
 			title: __( 'Reports', 'pv-bom-stock' ),
 			blocks: array(
-				Section::text( '<p>' . __( 'Five tabs, all read-only and computed live.', 'pv-bom-stock' ) . '</p>' ),
+				Section::text( '<p>' . __( 'Six tabs, all read-only and computed live.', 'pv-bom-stock' ) . '</p>' ),
 				Section::text( '<p>' . __( '<strong>Buildable</strong> — every made-to-order product\'s current buildable quantity and which component is the bottleneck.', 'pv-bom-stock' ) . '</p>' ),
 				Section::screenshot( 'reports-buildable.png', __( 'The Reports screen\'s Buildable tab.', 'pv-bom-stock' ) ),
 				Section::text( '<p>' . __( '<strong>Low Stock</strong> — components at or below WooCommerce\'s own low-stock threshold, and how many products each one blocks. When Vendors & Purchase Orders is on, this also shows what is already on order, so a low number does not necessarily mean it is time to reorder.', 'pv-bom-stock' ) . '</p>' ),
@@ -37,6 +37,8 @@ final class Reports {
 				Section::screenshot( 'reports-usage.png', __( 'The Reports screen\'s Component Usage tab with unit of measure and run-rate columns.', 'pv-bom-stock' ) ),
 				Section::text( '<p>' . __( '<strong>Ledger</strong> — every stock movement this plugin has ever recorded, filterable by product, reason, and date.', 'pv-bom-stock' ) . '</p>' ),
 				Section::screenshot( 'reports-ledger.png', __( 'The Reports screen\'s Ledger tab, filtered by reason.', 'pv-bom-stock' ) ),
+				Section::text( '<p>' . __( '<strong>Profitability</strong> — realized revenue, cost, profit, and margin from real placed orders (never a live storefront-price estimate), refund-netted so a partially or fully refunded sale is never overstated. Product, Order, and a trailing-12-month Trend view, a date-range filter (the Trend view always covers the last 12 calendar months regardless of it), and CSV export. A sale with no cost basis on file shows its margin as a ceiling rather than an exact figure rather than silently treating the missing cost as zero.', 'pv-bom-stock' ) . '</p>' ),
+				Section::screenshot( 'reports-profitability.png', __( 'The Reports screen\'s Profitability tab, Product view.', 'pv-bom-stock' ) ),
 				Section::text(
 					'<p>' . __( 'Turning on the "Cost of Goods Sold from BOM" toggle (see "Building a BOM") does not just affect the Margin tab here — it is also what feeds WooCommerce\'s <em>own</em> native Analytics with a real, BOM-derived cost instead of a manually typed one, so this plugin\'s cost math and WooCommerce\'s profit reporting stay in agreement.', 'pv-bom-stock' ) . '</p>'
 				),
@@ -54,6 +56,9 @@ final class Reports {
 				'/wcbom/v1/reports/margin',
 				'/wcbom/v1/reports/usage',
 				'/wcbom/v1/reports/usage/(?P<component_id>\d+)',
+				'/wcbom/v1/reports/profitability/product',
+				'/wcbom/v1/reports/profitability/order',
+				'/wcbom/v1/reports/profitability/trend',
 				'/wcbom/v1/ledger',
 			)
 		);

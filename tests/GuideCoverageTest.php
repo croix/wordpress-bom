@@ -26,6 +26,7 @@ use WCBOM\Install\SampleData;
 use WCBOM\Manufacture\ManufactureRepository;
 use WCBOM\Manufacture\ManufactureService;
 use WCBOM\Manufacture\ProductFactory;
+use WCBOM\Orders\OrderItemCostRepository;
 use WCBOM\Purchasing\LandedCost;
 use WCBOM\Purchasing\PurchaseOrderMailer;
 use WCBOM\Purchasing\PurchaseOrderRepository;
@@ -37,6 +38,8 @@ use WCBOM\Reports\BuildableReport;
 use WCBOM\Reports\ComponentUsageReport;
 use WCBOM\Reports\LowStockReport;
 use WCBOM\Reports\MarginReport;
+use WCBOM\Reports\ProfitabilityAggregator;
+use WCBOM\Reports\ProfitabilityReport;
 use WCBOM\Rest\Api;
 use WCBOM\Rest\InventoryApi;
 use WCBOM\Rest\LedgerApi;
@@ -180,7 +183,8 @@ final class GuideCoverageTest extends WCBOM_UnitTestCase {
 		( new SampleDataApi( new SampleData() ) )->register_routes();
 		( new ManufactureApi( new ManufactureService( $mo_orders, $boms, $stock, $guard, $factory ), $mo_orders, $boms ) )->register_routes();
 		( new PurchasingApi( new PurchaseOrderService( $po_orders, $stock, $guard ), $po_orders, $vendors, new LandedCost(), new PurchaseOrderMailer( $vendors ) ) )->register_routes();
-		( new ReportsApi( new BuildableReport( $boms ), new ComponentUsageReport( $boms, $ledger ), new LowStockReport( $boms, $po_orders ), new MarginReport( $boms, $matcher, $bom_cost ) ) )->register_routes();
+		$profitability_report = new ProfitabilityReport( new OrderItemCostRepository(), new ProfitabilityAggregator() );
+		( new ReportsApi( new BuildableReport( $boms ), new ComponentUsageReport( $boms, $ledger ), new LowStockReport( $boms, $po_orders ), new MarginReport( $boms, $matcher, $bom_cost ), $profitability_report ) )->register_routes();
 		( new LedgerApi( $ledger ) )->register_routes();
 
 		return array_keys( rest_get_server()->get_routes( 'wcbom/v1' ) );

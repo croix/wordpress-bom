@@ -13,6 +13,7 @@ use WCBOM\Reports\BuildableReport;
 use WCBOM\Reports\ComponentUsageReport;
 use WCBOM\Reports\LowStockReport;
 use WCBOM\Reports\MarginReport;
+use WCBOM\Reports\ProfitabilityReport;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -32,16 +33,18 @@ final class ReportsApi {
 	/**
 	 * Constructs the controller.
 	 *
-	 * @param BuildableReport      $buildable Buildable-stock report.
-	 * @param ComponentUsageReport $usage     Component usage report.
-	 * @param LowStockReport       $low_stock Low-stock report.
-	 * @param MarginReport         $margin    Margin report.
+	 * @param BuildableReport      $buildable     Buildable-stock report.
+	 * @param ComponentUsageReport $usage         Component usage report.
+	 * @param LowStockReport       $low_stock     Low-stock report.
+	 * @param MarginReport         $margin        Margin report.
+	 * @param ProfitabilityReport  $profitability Profitability reports (§5.15).
 	 */
 	public function __construct(
 		private readonly BuildableReport $buildable,
 		private readonly ComponentUsageReport $usage,
 		private readonly LowStockReport $low_stock,
-		private readonly MarginReport $margin
+		private readonly MarginReport $margin,
+		private readonly ProfitabilityReport $profitability
 	) {}
 
 	/**
@@ -97,6 +100,36 @@ final class ReportsApi {
 				'permission_callback' => array( $this, 'can_manage' ),
 			)
 		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/reports/profitability/product',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'get_profitability_product' ),
+				'permission_callback' => array( $this, 'can_manage' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/reports/profitability/order',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'get_profitability_order' ),
+				'permission_callback' => array( $this, 'can_manage' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/reports/profitability/trend',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'get_profitability_trend' ),
+				'permission_callback' => array( $this, 'can_manage' ),
+			)
+		);
 	}
 
 	/**
@@ -148,5 +181,57 @@ final class ReportsApi {
 		}
 
 		return new WP_REST_Response( $row );
+	}
+
+	/**
+	 * GET /reports/profitability/product. Accepts `date_from`/`date_to`
+	 * (Y-m-d), defaulting to the trailing 30 days.
+	 *
+	 * @param WP_REST_Request $request Optional date_from/date_to query params.
+	 */
+	public function get_profitability_product( WP_REST_Request $request ): WP_REST_Response {
+		[ $date_from, $date_to ] = $this->date_range( $request );
+
+		return new WP_REST_Response( array( 'rows' => $this->profitability->product_rows( $date_from, $date_to ) ) );
+	}
+
+	/**
+	 * GET /reports/profitability/order. Same date-range params as the product view.
+	 *
+	 * @param WP_REST_Request $request Optional date_from/date_to query params.
+	 */
+	public function get_profitability_order( WP_REST_Request $request ): WP_REST_Response {
+		[ $date_from, $date_to ] = $this->date_range( $request );
+
+		return new WP_REST_Response( array( 'rows' => $this->profitability->order_rows( $date_from, $date_to ) ) );
+	}
+
+	/**
+	 * GET /reports/profitability/trend — always the trailing 12 calendar
+	 * months, independent of the product/order views' date range.
+	 */
+	public function get_profitability_trend(): WP_REST_Response {
+		return new WP_REST_Response( array( 'rows' => $this->profitability->trend_rows() ) );
+	}
+
+	/**
+	 * The product/order profitability views' shared date-range params,
+	 * defaulting to the trailing 30 days when not supplied.
+	 *
+	 * @param WP_REST_Request $request Optional date_from/date_to (Y-m-d) query params.
+	 * @return array{0:string,1:string} date_from, date_to.
+	 */
+	private function date_range( WP_REST_Request $request ): array {
+		$date_from = (string) $request->get_param( 'date_from' );
+		$date_to   = (string) $request->get_param( 'date_to' );
+
+		if ( '' === $date_to ) {
+			$date_to = current_time( 'Y-m-d' );
+		}
+		if ( '' === $date_from ) {
+			$date_from = gmdate( 'Y-m-d', strtotime( current_time( 'mysql' ) . ' -30 days' ) );
+		}
+
+		return array( $date_from, $date_to );
 	}
 }

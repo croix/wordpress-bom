@@ -14,8 +14,8 @@ use WCBOM\Bom\Bom;
 use WCBOM\Bom\BomRepository;
 use WCBOM\Bom\ConditionMatcher;
 use WCBOM\Bom\ProductMode;
-use WCBOM\Manufacture\ManufactureRepository;
 use WCBOM\Reports\BomCost;
+use WCBOM\Reports\ManufacturedCost;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -39,16 +39,16 @@ final class CogsProvider {
 	/**
 	 * Constructs the integration.
 	 *
-	 * @param BomRepository         $boms     BOM lookup.
-	 * @param ConditionMatcher      $matcher  Resolves which lines a variation's selection matches.
-	 * @param BomCost               $cost     Shared Σ(component price × qty) calculation.
-	 * @param ManufactureRepository $mo_orders Manufacture order lookup, for MANUFACTURED products' build-time cost.
+	 * @param BomRepository    $boms             BOM lookup.
+	 * @param ConditionMatcher $matcher          Resolves which lines a variation's selection matches.
+	 * @param BomCost          $cost             Shared Σ(component price × qty) calculation.
+	 * @param ManufacturedCost $manufactured_cost Shared MANUFACTURED build-snapshot cost calculation.
 	 */
 	public function __construct(
 		private readonly BomRepository $boms,
 		private readonly ConditionMatcher $matcher,
 		private readonly BomCost $cost,
-		private readonly ManufactureRepository $mo_orders
+		private readonly ManufacturedCost $manufactured_cost
 	) {}
 
 	/**
@@ -85,7 +85,7 @@ final class CogsProvider {
 		}
 
 		if ( ProductMode::MANUFACTURED === $mode ) {
-			$snapshot_cost = $this->manufactured_snapshot_cost( $product_id );
+			$snapshot_cost = $this->manufactured_cost->for_product( $product_id );
 			if ( null !== $snapshot_cost ) {
 				return $snapshot_cost;
 			}
@@ -94,30 +94,6 @@ final class CogsProvider {
 		// MADE_TO_ORDER, or a MANUFACTURED product never yet built — both
 		// price out from live component prices against the current BOM.
 		return $this->live_bom_cost( $product, $bom );
-	}
-
-	/**
-	 * A MANUFACTURED product's cost per the latest completed manufacture
-	 * order's snapshot: Σ(qty_per_unit × unit_cost) over its consumption
-	 * lines — what a unit actually cost to build, not what it would cost
-	 * today. Null if never built, so the caller falls back to live cost.
-	 *
-	 * @param int $product_id The finished good.
-	 */
-	private function manufactured_snapshot_cost( int $product_id ): ?float {
-		$mo = $this->mo_orders->latest_completed_for_product( $product_id );
-		if ( null === $mo ) {
-			return null;
-		}
-
-		$cost = 0.0;
-		foreach ( $mo->items as $item ) {
-			if ( null !== $item->unit_cost ) {
-				$cost += $item->qty_per_unit * $item->unit_cost;
-			}
-		}
-
-		return $cost;
 	}
 
 	/**
